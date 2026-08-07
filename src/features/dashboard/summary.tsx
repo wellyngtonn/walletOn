@@ -64,7 +64,6 @@ export function Summary({
       {/* Hero Card */}
       <div className="saldo-mes-card">
         <div className="saldo-mes-main">
-          <span className="saldo-mes-label">Saldo do mês</span>
           <span className="saldo-mes-value">
             {pierreBalance === null ? "—" : currency(pierreBalance)}
           </span>
