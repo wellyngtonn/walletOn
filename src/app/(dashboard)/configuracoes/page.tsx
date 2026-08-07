@@ -14,6 +14,7 @@ import {
   listTransactions,
 } from "@/services/transactions";
 import { PierreImport } from "@/components/pierre-import";
+import { StatementExport } from "@/components/statement-export";
 import type { AccentColor } from "@/types";
 import {
   normalizeBackup,
@@ -236,6 +237,8 @@ export default function ConfiguracoesPage() {
         </div>
 
         <PierreImport />
+
+        <StatementExport onStatus={setToast} />
 
         <div className="settings-card">
           <h4 className="settings-card-title">Dados</h4>
