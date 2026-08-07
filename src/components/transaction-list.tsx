@@ -13,9 +13,11 @@ const labels: Record<TransactionType, string> = {
 export function TransactionList({
   items,
   onEdit,
+  showActions = true,
 }: {
   items: Transaction[];
   onEdit: (t: Transaction) => void;
+  showActions?: boolean;
 }) {
   const { user } = useAuth();
 
@@ -47,17 +49,19 @@ export function TransactionList({
           <p className={`tx-val ${t.type === "income" ? "in" : "out"}`}>
             {t.type === "income" ? "+" : "−"} {currency(t.amount)}
           </p>
-          <div className="tx-actions">
-            <button onClick={() => onEdit(t)} className="tx-action-btn">
-              Editar
-            </button>
-            <button
-              onClick={() => void remove(t.id)}
-              className="tx-action-btn danger"
-            >
-              Excluir
-            </button>
-          </div>
+          {showActions && (
+            <div className="tx-actions">
+              <button onClick={() => onEdit(t)} className="tx-action-btn">
+                Editar
+              </button>
+              <button
+                onClick={() => void remove(t.id)}
+                className="tx-action-btn danger"
+              >
+                Excluir
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

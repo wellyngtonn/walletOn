@@ -1121,8 +1121,7 @@ select {
     grid-template-columns: 36px minmax(0, 1fr);
     grid-template-areas:
       "icon info"
-      "icon value"
-      "icon actions";
+      "icon value";
     align-items: start;
     column-gap: 10px;
     row-gap: 2px;
@@ -1149,11 +1148,6 @@ select {
     margin-top: 2px;
   }
 
-  .analysis-transactions-card .tx-actions {
-    grid-area: actions;
-    justify-content: flex-start;
-    margin-top: 2px;
-  }
 }
 
 /* ─── ERROR / SUCCESS ───────────────── */

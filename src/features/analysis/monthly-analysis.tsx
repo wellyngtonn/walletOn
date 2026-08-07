@@ -395,7 +395,11 @@ export function MonthlyAnalysis({
           />
           <small>Busca aplicada ao mês selecionado</small>
         </div>
-        <TransactionList items={filteredItems} onEdit={onEdit} />
+        <TransactionList
+          items={filteredItems}
+          onEdit={onEdit}
+          showActions={false}
+        />
       </div>
     </>
   );

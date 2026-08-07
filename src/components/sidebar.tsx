@@ -9,7 +9,7 @@ const links = [
   { href: "/resumo", label: "Painel" },
   { href: "/analise", label: "Análise Mensal" },
   { href: "/planejamento", label: "Plano" },
-  { href: "/configuracoes", label: "Configurações" },
+  { href: "/configuracoes", label: "Ajustes" },
 ];
 
 export function Sidebar() {
