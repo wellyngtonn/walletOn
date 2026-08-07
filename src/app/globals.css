@@ -1115,6 +1115,45 @@ select {
   .analysis-select {
     width: 100%;
   }
+
+  .analysis-transactions-card .tx-item {
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-areas:
+      "icon info"
+      "icon value"
+      "icon actions";
+    align-items: start;
+    column-gap: 10px;
+    row-gap: 2px;
+  }
+
+  .analysis-transactions-card .tx-icon {
+    grid-area: icon;
+  }
+
+  .analysis-transactions-card .tx-info {
+    grid-area: info;
+  }
+
+  .analysis-transactions-card .tx-desc {
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .analysis-transactions-card .tx-val {
+    grid-area: value;
+    justify-self: start;
+    margin-top: 2px;
+  }
+
+  .analysis-transactions-card .tx-actions {
+    grid-area: actions;
+    justify-content: flex-start;
+    margin-top: 2px;
+  }
 }
 
 /* ─── ERROR / SUCCESS ───────────────── */

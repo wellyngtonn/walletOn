@@ -377,7 +377,7 @@ export function MonthlyAnalysis({
         <p className="forecast-caption">Projeção baseada no ritmo médio de gastos do mês.</p>
       </div>
 
-      <div className="widget analysis-full-card">
+      <div className="widget analysis-full-card analysis-transactions-card">
         <div className="analysis-widget-header">
           <h3 className="analysis-widget-title">Todas as Transações</h3>
           <div className="analysis-export-actions">
