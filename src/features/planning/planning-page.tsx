@@ -101,34 +101,6 @@ export function PlanningPage() {
     () => recurrences.filter((recurrence) => recurrenceScheduled(recurrence, year, month)),
     [month, recurrences, year],
   );
-  const plannedExpenses = useMemo(
-    () => [
-      ...monthPlans.filter((plan) => plan.type === "expense").map((plan) => ({
-        category: plan.category,
-        amount: plan.amount,
-      })),
-      ...scheduledRecurrences
-        .filter((recurrence) => recurrence.type === "expense")
-        .map((recurrence) => ({ category: recurrence.category, amount: recurrence.amount })),
-    ],
-    [monthPlans, scheduledRecurrences],
-  );
-  const topCategories = useMemo(() => {
-    const totals = new Map<string, number>();
-    plannedExpenses.forEach((item) =>
-      totals.set(item.category, (totals.get(item.category) || 0) + item.amount),
-    );
-    const total = plannedExpenses.reduce((sum, item) => sum + item.amount, 0);
-    return Array.from(totals.entries())
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3)
-      .map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: total ? (amount / total) * 100 : 0,
-      }));
-  }, [plannedExpenses]);
-
   const predictedIncome =
     monthPlans.filter((plan) => plan.type === "income").reduce((sum, plan) => sum + plan.amount, 0) +
     scheduledRecurrences
@@ -320,32 +292,20 @@ export function PlanningPage() {
       </div>
 
       <div className="plan-summary-grid">
-        <div className="plan-summary-card plan-summary-income">
-          <span>Previsto Entradas</span><strong>{currency(predictedIncome)}</strong>
-        </div>
-        <div className="plan-summary-card plan-summary-expense">
-          <span>Previsto Saídas</span><strong>{currency(predictedExpenses)}</strong>
-        </div>
-        <div className="plan-summary-card plan-summary-balance">
-          <span>Saldo Previsto</span><strong>{currency(predictedIncome - predictedExpenses)}</strong>
-        </div>
-      </div>
-
-      <div className="widget planning-full-card">
-        <div className="planning-widget-header"><h3 className="planning-widget-title">Top 3 Categorias (Gastos)</h3></div>
-        {topCategories.length === 0 ? <p className="tx-empty">Sem despesas neste mês</p> : (
-          <div className="top-plan-categories">
-            {topCategories.map((item, index) => (
-              <div className="top-plan-category" key={item.category}>
-                <div className="top-plan-category-head">
-                  <span>{index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"} {categoryIcon[item.category] || "📊"} {item.category}</span>
-                  <strong>{currency(item.amount)}</strong>
-                </div>
-                <div className="top-plan-progress"><div style={{ width: `${item.percentage}%` }}><span>{Math.round(item.percentage)}%</span></div></div>
-              </div>
-            ))}
+        <div className="plan-summary-card">
+          <div className="plan-summary-metric plan-summary-income">
+            <span>Previsto Entradas</span>
+            <strong>{currency(predictedIncome)}</strong>
           </div>
-        )}
+          <div className="plan-summary-metric plan-summary-expense">
+            <span>Previsto Saídas</span>
+            <strong>{currency(predictedExpenses)}</strong>
+          </div>
+          <div className="plan-summary-metric plan-summary-balance">
+            <span>Saldo Previsto</span>
+            <strong>{currency(predictedIncome - predictedExpenses)}</strong>
+          </div>
+        </div>
       </div>
 
       <div className="widget planning-full-card">
