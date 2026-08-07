@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { logout } from "@/services/auth";
 
 const links = [
   { href: "/resumo", label: "Painel" },
@@ -44,17 +43,6 @@ export function Sidebar() {
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
       >
-        <div className="mb-6 flex items-center gap-3 rounded-[14px] bg-[var(--bg)] p-3">
-          <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[0.95rem] font-bold text-white">
-            {initial.toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <span className="block truncate text-[0.88rem] font-bold text-[var(--text)]">
-              {name}
-            </span>
-          </div>
-        </div>
-
         <nav className="flex flex-1 flex-col gap-1">
           {links.map(({ href, label }) => (
             <Link
@@ -77,12 +65,16 @@ export function Sidebar() {
         </nav>
 
         <div className="border-t border-[var(--card-border)] pt-4">
-          <button
-            onClick={() => void logout()}
-            className="w-full rounded-[12px] px-3.5 py-[11px] text-left text-[0.9rem] font-semibold text-[var(--red)] transition-all duration-[180ms] hover:bg-[var(--red-bg)]"
-          >
-            Sair
-          </button>
+          <div className="flex items-center gap-3 rounded-[14px] bg-[var(--bg)] p-3">
+            <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[0.95rem] font-bold text-white">
+              {initial.toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <span className="block truncate text-[0.88rem] font-bold text-[var(--text)]">
+                {name}
+              </span>
+            </div>
+          </div>
         </div>
       </aside>
     </>
