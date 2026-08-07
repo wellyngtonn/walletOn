@@ -7,11 +7,13 @@ import {
   listTransactions,
 } from "@/services/transactions";
 import {
+  fetchPierreAccounts,
   fetchPierreTransactions,
   triggerPierreUpdate,
   validatePierreKey,
   type PierreTransaction,
 } from "@/services/pierre";
+import { savePierreBalance } from "@/services/profile";
 
 const MONTHS = [
   "Janeiro",
@@ -97,6 +99,13 @@ export function PierreImport() {
     );
   }
 
+  async function syncPierreBalance(apiKey: string) {
+    if (!user) return;
+    const accounts = await fetchPierreAccounts(apiKey);
+    const balance = accounts.reduce((total, account) => total + account.balance, 0);
+    await savePierreBalance(user.uid, balance);
+  }
+
   async function testKey() {
     if (!key.trim()) {
       setToast("Cole sua API Key.");
@@ -106,6 +115,7 @@ export function PierreImport() {
     setBusy(true);
     try {
       const result = await validatePierreKey(key.trim());
+      if (result.ok) await syncPierreBalance(key.trim());
       setToast(result.message);
     } finally {
       setBusy(false);
@@ -126,6 +136,7 @@ export function PierreImport() {
       if (!validation.ok) throw new Error(validation.message);
 
       await triggerPierreUpdate(key.trim());
+      await syncPierreBalance(key.trim());
 
       const today = new Date();
       const ago = new Date();
@@ -188,6 +199,16 @@ export function PierreImport() {
     }
     let total = 0;
     let errors = 0;
+
+    try {
+      const validation = await validatePierreKey(key.trim());
+      if (!validation.ok) throw new Error(validation.message);
+      await syncPierreBalance(key.trim());
+    } catch (error) {
+      setToast(errorMessage(error));
+      setBusy(false);
+      return;
+    }
 
     for (const { year, month } of meses) {
       setPeriodoStatus(`Buscando ${MONTHS[month]} ${year}...`);

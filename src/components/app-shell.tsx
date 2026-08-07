@@ -5,6 +5,7 @@ import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
 import { useAuth } from "@/hooks/useAuth";
+import { usePierreBalance } from "@/hooks/usePierreBalance";
 import { useTransactions } from "@/hooks/useTransactions";
 import type { Transaction } from "@/types";
 
@@ -15,6 +16,7 @@ type Ctx = {
   transactions: Transaction[];
   loading: boolean;
   error: string;
+  pierreBalance: number | null;
   openEdit: (t: Transaction) => void;
   openCreate: () => void;
 };
@@ -33,6 +35,7 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const data = useTransactions(user?.uid, month, year);
+  const { balance: pierreBalance, error: balanceError } = usePierreBalance(user?.uid);
 
   function openEdit(t: Transaction) {
     setEditing(t);
@@ -53,6 +56,8 @@ function Inner({ children }: { children: React.ReactNode }) {
           setYear(y);
         },
         ...data,
+        error: data.error || balanceError,
+        pierreBalance,
         openEdit,
         openCreate,
       }}

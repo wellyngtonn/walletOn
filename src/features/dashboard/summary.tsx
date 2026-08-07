@@ -1,16 +1,4 @@
 "use client";
-import {
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
 import type { Transaction } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { useState } from "react";
@@ -26,22 +14,16 @@ export function Summary({
   items,
   month,
   year,
+  pierreBalance,
 }: {
   items: Transaction[];
   month: number;
   year: number;
+  pierreBalance: number | null;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const totals = { income: 0, expense: 0, investment: 0 };
   items.forEach((t) => (totals[t.type] += t.amount));
-  const balance = totals.income - totals.expense - totals.investment;
-  const hasData = totals.income + totals.expense + totals.investment > 0;
-
-  const chart = [
-    { name: "Receitas", value: totals.income, color: "#34c759" },
-    { name: "Despesas", value: totals.expense, color: "#ff3b30" },
-    { name: "Investimentos", value: totals.investment, color: "#a64ce6" },
-  ];
 
   const filteredItems = selectedDay
     ? items.filter(
@@ -73,24 +55,36 @@ export function Summary({
       <div className="saldo-mes-card">
         <div className="saldo-mes-main">
           <span className="saldo-mes-label">Saldo do mês</span>
-          <span className="saldo-mes-value">{currency(balance)}</span>
+          <span className="saldo-mes-value">
+            {pierreBalance === null ? "—" : currency(pierreBalance)}
+          </span>
           <p className="saldo-mes-meta">
-            {hasData ? "Carteira consolidada" : "Nenhum movimento no período"}
+            {pierreBalance === null
+              ? "Sincronize sua conta no Pierre Finance"
+              : "Saldo atualizado pelo Pierre Finance"}
           </p>
         </div>
 
         <div className="saldo-mes-subgrid">
           <div className="saldo-mes-sub in">
-            <span className="saldo-mes-sub-label">Entradas</span>
+            <div className="saldo-mes-sub-head">
+              <span className="saldo-mes-sub-icon" aria-hidden="true">↗</span>
+              <span className="saldo-mes-sub-label">Entradas</span>
+            </div>
             <span className="saldo-mes-sub-value">
-              {currency(totals.income)}
+              + {currency(totals.income)}
             </span>
+            <span className="saldo-mes-sub-meta">Total recebido no período</span>
           </div>
           <div className="saldo-mes-sub out">
-            <span className="saldo-mes-sub-label">Saídas</span>
+            <div className="saldo-mes-sub-head">
+              <span className="saldo-mes-sub-icon" aria-hidden="true">↘</span>
+              <span className="saldo-mes-sub-label">Saídas</span>
+            </div>
             <span className="saldo-mes-sub-value">
-              {currency(totals.expense + totals.investment)}
+              − {currency(totals.expense + totals.investment)}
             </span>
+            <span className="saldo-mes-sub-meta">Despesas e investimentos</span>
           </div>
         </div>
       </div>
@@ -105,58 +99,8 @@ export function Summary({
         />
       </div>
 
-      {/* Grid */}
-      <div className="mb-4 grid gap-4 lg:grid-cols-2">
-        {/* Graficos */}
-        <div className="flex flex-col gap-4">
-          <div className="widget">
-            <h2 className="mb-4 text-[0.7rem] font-semibold uppercase tracking-[0.5px] text-[var(--text3)]">
-              Distribuição
-            </h2>
-            <div className="chart-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chart}
-                    dataKey="value"
-                    nameKey="name"
-                    innerRadius={52}
-                    outerRadius={80}
-                    paddingAngle={4}
-                  >
-                    {chart.map((x) => (
-                      <Cell key={x.name} fill={x.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(v) => currency(Number(v))} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="widget">
-            <h2 className="mb-4 text-[0.7rem] font-semibold uppercase tracking-[0.5px] text-[var(--text3)]">
-              Comparativo
-            </h2>
-            <div className="chart-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chart}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" fontSize={11} />
-                  <YAxis fontSize={11} />
-                  <Tooltip formatter={(v) => currency(Number(v))} />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                    {chart.map((x) => (
-                      <Cell key={x.name} fill={x.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Transactions */}
+      {/* Recent Transactions */}
+      <div className="mb-4">
         <div className="widget flex max-h-[558px] flex-col overflow-hidden">
           <div className="mb-3 flex items-center justify-between">
             {selectedDay && (
