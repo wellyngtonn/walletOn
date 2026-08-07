@@ -34,9 +34,14 @@ export function subscribePierreProfile(
               typeof account.balance === "number",
           )
         : [];
+      const accountId =
+        typeof data.pierreAccountId === "string" ? data.pierreAccountId : null;
       onData({
-        balance: typeof data.pierreBalance === "number" ? data.pierreBalance : null,
-        accountId: typeof data.pierreAccountId === "string" ? data.pierreAccountId : null,
+        balance:
+          accountId && typeof data.pierreBalance === "number"
+            ? data.pierreBalance
+            : null,
+        accountId,
         accountName:
           typeof data.pierreAccountName === "string" ? data.pierreAccountName : null,
         accounts,
