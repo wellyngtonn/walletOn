@@ -2,7 +2,6 @@
 import { createContext, useContext, useState } from "react";
 import { AuthGuard } from "./auth-guard";
 import { Sidebar } from "./sidebar";
-import { ThemeControls } from "./theme-controls";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
 import { useAuth } from "@/hooks/useAuth";
@@ -72,7 +71,6 @@ function Inner({ children }: { children: React.ReactNode }) {
                 setYear(y);
               }}
             />
-            <ThemeControls />
           </div>
         </header>
         <div className="mx-auto max-w-[1160px]">{children}</div>
