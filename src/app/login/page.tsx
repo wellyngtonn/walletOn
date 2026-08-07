@@ -7,6 +7,7 @@ import {
   resetPassword,
   signInEmail,
   signInGoogle,
+  completeGoogleRedirect,
 } from "@/services/auth";
 
 type Mode = "login" | "register" | "reset";
@@ -26,6 +27,18 @@ export default function Login() {
   useEffect(() => {
     if (user) router.replace("/resumo");
   }, [user, router]);
+
+  useEffect(() => {
+    void completeGoogleRedirect().catch((err) => {
+      const code = err && typeof err === "object" && "code" in err ? err.code : "";
+      const text = err instanceof Error ? err.message : "Erro ao entrar com Google.";
+      setError(
+        code === "auth/unauthorized-domain"
+          ? "Este domínio ainda não está autorizado no Firebase Authentication."
+          : text.replace("Firebase: ", ""),
+      );
+    });
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -124,8 +137,11 @@ export default function Login() {
             <button
               onClick={() =>
                 void signInGoogle().catch((e) => {
+                  const code = e && typeof e === "object" && "code" in e ? e.code : "";
                   const msg =
-                    e instanceof Error
+                    code === "auth/unauthorized-domain"
+                      ? "Este domínio ainda não está autorizado no Firebase Authentication."
+                      : e instanceof Error
                       ? e.message.replace("Firebase: ", "")
                       : "Erro ao entrar com Google.";
                   setError(msg);
