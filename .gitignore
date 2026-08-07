@@ -1,6 +1,7 @@
 node_modules
 .next
 .test-dist
+.firebase
 *.tsbuildinfo
 .env.local
 out
