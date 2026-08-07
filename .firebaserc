@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "wallet-on-c0b05",
+    "walletOn": "wallet-on-c0b05"
+  },
+  "targets": {},
+  "etags": {}
+}

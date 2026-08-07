@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function validTransaction(uid) {
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','referenceMonth','referenceYear','pierreId','category','accountId','recurrenceId','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['userId','type','description','amount','date','referenceMonth','referenceYear','updatedAt'])
+        && request.resource.data.userId == uid
+        && request.resource.data.type in ['income','expense','investment']
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 120
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.date is string
+        && request.resource.data.date.size() == 10
+        && request.resource.data.referenceMonth is int
+        && request.resource.data.referenceMonth >= 1 && request.resource.data.referenceMonth <= 12
+        && request.resource.data.referenceYear is int
+        && (!request.resource.data.keys().hasAny(['pierreId']) || request.resource.data.pierreId is string)
+        && (!request.resource.data.keys().hasAny(['category']) || request.resource.data.category is string)
+        && (!request.resource.data.keys().hasAny(['accountId']) || request.resource.data.accountId is string)
+        && (!request.resource.data.keys().hasAny(['recurrenceId']) || request.resource.data.recurrenceId is string);
+    }
+    function validPlan(uid) {
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','category','paid','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['userId','type','description','amount','date','category','updatedAt'])
+        && request.resource.data.userId == uid
+        && request.resource.data.type in ['income','expense']
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 120
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.date is string
+        && request.resource.data.date.size() == 10
+        && request.resource.data.category is string
+        && request.resource.data.category.size() > 0
+        && request.resource.data.category.size() <= 60
+        && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool);
+    }
+    function validRecurrence(uid) {
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','startDate','originalDay','category','period','limit','paid','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['userId','type','description','amount','startDate','originalDay','category','period','updatedAt'])
+        && request.resource.data.userId == uid
+        && request.resource.data.type in ['income','expense']
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 120
+        && request.resource.data.amount is number
+        && request.resource.data.amount > 0
+        && request.resource.data.startDate is string
+        && request.resource.data.startDate.size() == 10
+        && request.resource.data.originalDay is int
+        && request.resource.data.originalDay >= 1
+        && request.resource.data.originalDay <= 31
+        && request.resource.data.category is string
+        && request.resource.data.category.size() > 0
+        && request.resource.data.category.size() <= 60
+        && request.resource.data.period in ['monthly','quarterly','yearly']
+        && (!request.resource.data.keys().hasAny(['limit']) || (request.resource.data.limit is int && request.resource.data.limit >= 1))
+        && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool);
+    }
+    match /users/{uid} {
+      allow read, create, update: if isOwner(uid);
+      allow delete: if false;
+      match /transactions/{transactionId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validTransaction(uid);
+      }
+      match /plans/{planId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validPlan(uid);
+      }
+      match /recurrences/{recurrenceId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validRecurrence(uid);
+      }
+    }
+  }
+}
