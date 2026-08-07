@@ -38,7 +38,7 @@ export function Sidebar() {
       )}
 
       <aside
-        className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
+        className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 pt-20 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)] md:pt-4"
         style={{
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
