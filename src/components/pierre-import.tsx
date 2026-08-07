@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { usePierreBalance } from "@/hooks/usePierreBalance";
 import {
   createTransaction,
   listTransactions,
@@ -11,9 +12,13 @@ import {
   fetchPierreTransactions,
   triggerPierreUpdate,
   validatePierreKey,
+  type PierreAccount,
   type PierreTransaction,
 } from "@/services/pierre";
-import { savePierreBalance } from "@/services/profile";
+import {
+  savePierreAccountSelection,
+  savePierreAccounts,
+} from "@/services/profile";
 
 const MONTHS = [
   "Janeiro",
@@ -43,7 +48,13 @@ function errorMessage(error: unknown): string {
 
 export function PierreImport() {
   const { user } = useAuth();
+  const {
+    accounts: savedAccounts,
+    accountId: savedAccountId,
+  } = usePierreBalance(user?.uid);
   const [key, setKey] = useState("");
+  const [accounts, setAccounts] = useState<PierreAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [toast, setToast] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPeriodo, setShowPeriodo] = useState(false);
@@ -54,6 +65,11 @@ export function PierreImport() {
   useEffect(() => {
     setKey("");
   }, []);
+
+  useEffect(() => {
+    setAccounts(savedAccounts);
+    setSelectedAccountId(savedAccountId || savedAccounts[0]?.id || "");
+  }, [savedAccounts, savedAccountId]);
 
   async function importItems(
     items: PierreTransaction[],
@@ -101,9 +117,32 @@ export function PierreImport() {
 
   async function syncPierreBalance(apiKey: string) {
     if (!user) return;
-    const accounts = await fetchPierreAccounts(apiKey);
-    const balance = accounts.reduce((total, account) => total + account.balance, 0);
-    await savePierreBalance(user.uid, balance);
+    const fetchedAccounts = await fetchPierreAccounts(apiKey);
+    const preferredId = selectedAccountId || savedAccountId;
+    const selectedAccount =
+      fetchedAccounts.find((account) => account.id === preferredId) ||
+      fetchedAccounts[0];
+    if (!selectedAccount) throw new Error("Nenhuma carteira encontrada no Pierre.");
+
+    setAccounts(fetchedAccounts);
+    setSelectedAccountId(selectedAccount.id);
+    await savePierreAccounts(user.uid, fetchedAccounts, selectedAccount);
+  }
+
+  async function changeAccount(accountId: string) {
+    const account = accounts.find((item) => item.id === accountId);
+    if (!user || !account) return;
+
+    setSelectedAccountId(account.id);
+    setBusy(true);
+    try {
+      await savePierreAccountSelection(user.uid, account);
+      setToast(`Carteira selecionada: ${account.name}`);
+    } catch (error) {
+      setToast(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function testKey() {
@@ -274,6 +313,34 @@ export function PierreImport() {
           >
             Importar por Período
           </button>
+        </div>
+
+        <div className="mt-3">
+          <label className="mb-1.5 block text-xs font-semibold text-[var(--text3)]">
+            Carteira exibida no Resumo
+          </label>
+          <select
+            className="settings-input w-full"
+            value={selectedAccountId}
+            onChange={(event) => void changeAccount(event.target.value)}
+            disabled={busy || accounts.length === 0}
+          >
+            {accounts.length === 0 ? (
+              <option value="">Valide a API Key para carregar as carteiras</option>
+            ) : (
+              accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name} — {account.balance.toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </option>
+              ))
+            )}
+          </select>
+          <p className="mt-1.5 text-xs text-[var(--text3)]">
+            O Resumo mostra somente o saldo e os lançamentos desta carteira.
+          </p>
         </div>
       </div>
 

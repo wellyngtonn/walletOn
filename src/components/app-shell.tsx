@@ -17,6 +17,8 @@ type Ctx = {
   loading: boolean;
   error: string;
   pierreBalance: number | null;
+  pierreAccountId: string | null;
+  pierreAccountName: string | null;
   openEdit: (t: Transaction) => void;
   openCreate: () => void;
 };
@@ -35,7 +37,12 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const data = useTransactions(user?.uid, month, year);
-  const { balance: pierreBalance, error: balanceError } = usePierreBalance(user?.uid);
+  const {
+    balance: pierreBalance,
+    accountId: pierreAccountId,
+    accountName: pierreAccountName,
+    error: balanceError,
+  } = usePierreBalance(user?.uid);
 
   function openEdit(t: Transaction) {
     setEditing(t);
@@ -58,6 +65,8 @@ function Inner({ children }: { children: React.ReactNode }) {
         ...data,
         error: data.error || balanceError,
         pierreBalance,
+        pierreAccountId,
+        pierreAccountName,
         openEdit,
         openCreate,
       }}

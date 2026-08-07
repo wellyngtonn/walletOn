@@ -1,25 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { subscribePierreBalance } from "@/services/profile";
+import {
+  subscribePierreProfile,
+  type PierreProfile,
+} from "@/services/profile";
 
 export function usePierreBalance(uid: string | undefined) {
-  const [balance, setBalance] = useState<number | null>(null);
+  const [profile, setProfile] = useState<PierreProfile>({
+    balance: null,
+    accountId: null,
+    accountName: null,
+    accounts: [],
+  });
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!uid) {
-      setBalance(null);
+      setProfile({ balance: null, accountId: null, accountName: null, accounts: [] });
       return;
     }
 
     setError("");
-    return subscribePierreBalance(
+    return subscribePierreProfile(
       uid,
-      setBalance,
+      setProfile,
       (snapshotError) => setError(snapshotError.message),
     );
   }, [uid]);
 
-  return { balance, error };
+  return { ...profile, error };
 }

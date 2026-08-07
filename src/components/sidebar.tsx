@@ -44,15 +44,6 @@ export function Sidebar() {
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
       >
-        <div className="mb-6">
-          <Link
-            href="/resumo"
-            className="text-lg font-extrabold tracking-[-0.3px] text-[var(--text)]"
-          >
-            Pierre Finance
-          </Link>
-        </div>
-
         <div className="mb-6 flex items-center gap-3 rounded-[14px] bg-[var(--bg)] p-3">
           <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[0.95rem] font-bold text-white">
             {initial.toUpperCase()}

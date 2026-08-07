@@ -3,7 +3,16 @@ import { useDashboard } from "@/components/app-shell";
 import { Summary } from "@/features/dashboard/summary";
 
 export default function Page() {
-  const { transactions, loading, error, month, year, pierreBalance } = useDashboard();
+  const {
+    transactions,
+    loading,
+    error,
+    month,
+    year,
+    pierreBalance,
+    pierreAccountId,
+    pierreAccountName,
+  } = useDashboard();
   if (loading) return <p className="text-[var(--text3)]">Carregando dados...</p>;
   return (
     <>
@@ -13,6 +22,8 @@ export default function Page() {
         month={month}
         year={year}
         pierreBalance={pierreBalance}
+        pierreAccountId={pierreAccountId}
+        pierreAccountName={pierreAccountName}
       />
     </>
   );

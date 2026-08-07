@@ -15,24 +15,34 @@ export function Summary({
   month,
   year,
   pierreBalance,
+  pierreAccountId,
+  pierreAccountName,
 }: {
   items: Transaction[];
   month: number;
   year: number;
   pierreBalance: number | null;
+  pierreAccountId: string | null;
+  pierreAccountName: string | null;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const visibleItems = pierreAccountId
+    ? items.filter(
+        (transaction) =>
+          transaction.pierreId && transaction.accountId === pierreAccountId,
+      )
+    : items;
   const totals = { income: 0, expense: 0, investment: 0 };
-  items.forEach((t) => (totals[t.type] += t.amount));
+  visibleItems.forEach((t) => (totals[t.type] += t.amount));
 
   const filteredItems = selectedDay
-    ? items.filter(
+    ? visibleItems.filter(
         (transaction) =>
           transaction.pierreId &&
           transaction.date ===
             `${year}-${String(month).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`,
       )
-    : items;
+    : visibleItems;
   const recent = [...filteredItems]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 8);
@@ -61,7 +71,7 @@ export function Summary({
           <p className="saldo-mes-meta">
             {pierreBalance === null
               ? "Sincronize sua conta no Pierre Finance"
-              : "Saldo atualizado pelo Pierre Finance"}
+              : `Saldo de ${pierreAccountName || "carteira selecionada"}`}
           </p>
         </div>
 
@@ -91,7 +101,7 @@ export function Summary({
 
       <div className="mb-4">
         <ExpenseHeatmap
-          items={items}
+          items={visibleItems}
           month={month}
           year={year}
           selectedDay={selectedDay}
