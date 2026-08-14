@@ -7,24 +7,30 @@ import {
 } from "@/services/transactions";
 import type { Transaction } from "@/types";
 
+const transactionsCache = new Map<string, Transaction[]>();
+
 export function useAllTransactions() {
   const { user } = useAuth();
+  const uid = user?.uid;
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user) {
+    if (!uid) {
       setTransactions([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = transactionsCache.get(uid);
+    setTransactions(cached || []);
+    setLoading(!cached);
     setError("");
     return subscribeAllTransactions(
-      user.uid,
+      uid,
       (items) => {
+        transactionsCache.set(uid, items);
         setTransactions(items);
         setLoading(false);
       },
@@ -33,7 +39,7 @@ export function useAllTransactions() {
         setLoading(false);
       },
     );
-  }, [user]);
+  }, [uid]);
 
   return { transactions, loading, error };
 }

@@ -3,15 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js"
+    "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js",
+    "firebase:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firebase.ps1",
+    "firebase:deploy:indexes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firestore-indexes.ps1"
   },
   "dependencies": {
     "firebase": "^12.1.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.536.0",
     "next": "^15.4.6",
     "next-themes": "^0.4.6",

@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { deleteTransaction } from "@/services/transactions";
 import type { Transaction, TransactionType } from "@/types";
 import { currency, dateBR } from "@/utils/format";
+import { pierreCategoryIcon } from "@/utils/pierre-category";
 
 const labels: Record<TransactionType, string> = {
   income: "Receita",
@@ -37,8 +38,12 @@ export function TransactionList({
     <div className="tx-list">
       {items.map((t) => (
         <div key={t.id} className="tx-item">
-          <div className={`tx-icon ${t.type === "income" ? "in" : "out"}`}>
-            {t.type === "income" ? "+" : "−"}
+          <div
+            className={`tx-icon ${t.type === "income" ? "in" : "out"}`}
+            title={t.category || "Outros"}
+            aria-label={`Categoria: ${t.category || "Outros"}`}
+          >
+            {pierreCategoryIcon(t.category, t.description, t.type)}
           </div>
           <div className="tx-info">
             <p className="tx-desc">{t.description}</p>

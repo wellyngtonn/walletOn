@@ -4,12 +4,29 @@ import {
   normalizeBackup,
   normalizePlan,
   normalizeRecurrence,
+  normalizeShoppingItem,
   normalizeTransaction,
 } from "../src/utils/backup";
 
 test("normaliza backup completo e mantém as três coleções", () => {
   const backup = normalizeBackup({ tx: [1], plan: [2], rec: [3] });
-  assert.deepEqual(backup, { tx: [1], plan: [2], rec: [3] });
+  assert.deepEqual(backup, { tx: [1], plan: [2], rec: [3], shop: [] });
+});
+
+test("normaliza item da lista de compras com preço e conclusão", () => {
+  const item = normalizeShoppingItem({
+    id: 7,
+    name: "Arroz",
+    qty: 2,
+    preco: "R$ 12,50",
+    done: true,
+    data: "05/08/2026",
+    dataConclusao: "06/08/2026",
+  });
+  assert.equal(item?.id, "carteira-shop-7");
+  assert.equal(item?.data.price, 12.5);
+  assert.equal(item?.data.completedDate, "2026-08-06");
+  assert.equal(item?.data.done, true);
 });
 
 test("normaliza transação brasileira com valor e data", () => {

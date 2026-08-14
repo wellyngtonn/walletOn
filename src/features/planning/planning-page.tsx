@@ -26,6 +26,7 @@ import {
   recurrenceDate,
   recurrenceExpired,
   recurrenceScheduled,
+  recurrenceStarted,
 } from "@/utils/planning";
 
 const CATEGORIES = [
@@ -99,6 +100,10 @@ export function PlanningPage() {
   );
   const scheduledRecurrences = useMemo(
     () => recurrences.filter((recurrence) => recurrenceScheduled(recurrence, year, month)),
+    [month, recurrences, year],
+  );
+  const startedRecurrences = useMemo(
+    () => recurrences.filter((recurrence) => recurrenceStarted(recurrence, year, month)),
     [month, recurrences, year],
   );
   const predictedIncome =
@@ -283,7 +288,7 @@ export function PlanningPage() {
 
   return (
     <>
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="mb-5 flex flex-col items-start gap-3">
         <h2 className="sec-title">Planejamento</h2>
         <div className="plan-actions">
           <button className="btn-primary" onClick={() => openPlan()}>＋ Lançamento</button>
@@ -330,9 +335,9 @@ export function PlanningPage() {
 
       <div className="widget planning-full-card">
         <div className="planning-widget-header"><h3 className="planning-widget-title">Recorrências Ativas</h3></div>
-        {!recurrences.length ? <p className="tx-empty">Nenhuma recorrência cadastrada.</p> : (
+        {!startedRecurrences.length ? <p className="tx-empty">Nenhuma recorrência iniciada neste mês.</p> : (
           <div className="tx-list">
-            {recurrences.map((recurrence) => {
+            {startedRecurrences.map((recurrence) => {
               const expired = recurrenceExpired(recurrence, year, month);
               return (
                 <div className={`tx-item ${expired ? "plan-item-expired" : ""} ${recurrence.paid ? "plan-item-paid" : ""}`} key={recurrence.id}>

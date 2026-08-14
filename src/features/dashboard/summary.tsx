@@ -1,8 +1,12 @@
 "use client";
+
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import type { Transaction } from "@/types";
 import { currency, dateBR } from "@/utils/format";
-import { useState } from "react";
+import { pierreCategoryIcon } from "@/utils/pierre-category";
 import { ExpenseHeatmap } from "@/components/expense-heatmap";
+import { usePierreSyncStatus } from "@/hooks/usePierreAutoSync";
 
 const typeLabels: Record<string, string> = {
   income: "Receita",
@@ -26,14 +30,14 @@ export function Summary({
   pierreAccountName: string | null;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [valuesHidden, setValuesHidden] = useState(true);
+  const pierreSynced = usePierreSyncStatus();
   const visibleItems = pierreAccountId
     ? items.filter(
         (transaction) =>
           transaction.pierreId && transaction.accountId === pierreAccountId,
       )
     : items;
-  const totals = { income: 0, expense: 0, investment: 0 };
-  visibleItems.forEach((t) => (totals[t.type] += t.amount));
 
   const filteredItems = selectedDay
     ? visibleItems.filter(
@@ -58,43 +62,46 @@ export function Summary({
         ),
       )
     : null;
+  const accountLabel = (pierreAccountName || "Conta não importada")
+    .replace(/^Carteira\s+\d+\s*-\s*/i, "")
+    .toUpperCase();
+  const displayedBalance = valuesHidden
+    ? "••••••"
+    : pierreBalance === null
+      ? "—"
+      : currency(pierreBalance);
 
   return (
     <>
-      {/* Hero Card */}
       <div className="saldo-mes-card">
-        <div className="saldo-mes-main">
-          <span className="saldo-mes-value">
-            {pierreBalance === null ? "—" : currency(pierreBalance)}
-          </span>
-          <p className="saldo-mes-meta">
-            {pierreBalance === null
-              ? "Sincronize sua conta no Pierre Finance"
-              : `Saldo de ${pierreAccountName || "carteira selecionada"}`}
-          </p>
+        <div className="saldo-mes-account">
+          {pierreSynced && (
+            <span
+              className="pierre-sync-dot"
+              title="Pierre Finance sincronizado"
+              aria-label="Pierre Finance sincronizado"
+            />
+          )}
+          <span className="saldo-mes-account-name">{accountLabel}</span>
+          <span className="saldo-mes-account-label">SALDO</span>
         </div>
-
-        <div className="saldo-mes-subgrid">
-          <div className="saldo-mes-sub in">
-            <div className="saldo-mes-sub-head">
-              <span className="saldo-mes-sub-icon" aria-hidden="true">↗</span>
-              <span className="saldo-mes-sub-label">Entradas</span>
-            </div>
-            <span className="saldo-mes-sub-value">
-              + {currency(totals.income)}
-            </span>
-            <span className="saldo-mes-sub-meta">Total recebido no período</span>
+        <div className="saldo-mes-balance">
+          <div className="saldo-mes-actions" aria-label="Controles do saldo">
+            <button
+              type="button"
+              className="saldo-mes-action"
+              title={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
+              aria-label={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
+              onClick={() => setValuesHidden((hidden) => !hidden)}
+            >
+              {valuesHidden ? (
+                <EyeOff size={16} aria-hidden="true" />
+              ) : (
+                <Eye size={16} aria-hidden="true" />
+              )}
+            </button>
           </div>
-          <div className="saldo-mes-sub out">
-            <div className="saldo-mes-sub-head">
-              <span className="saldo-mes-sub-icon" aria-hidden="true">↘</span>
-              <span className="saldo-mes-sub-label">Saídas</span>
-            </div>
-            <span className="saldo-mes-sub-value">
-              − {currency(totals.expense + totals.investment)}
-            </span>
-            <span className="saldo-mes-sub-meta">Despesas e investimentos</span>
-          </div>
+          <span className="saldo-mes-value">{displayedBalance}</span>
         </div>
       </div>
 
@@ -105,10 +112,10 @@ export function Summary({
           year={year}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          valuesHidden={valuesHidden}
         />
       </div>
 
-      {/* Recent Transactions */}
       <div className="mb-4">
         <div className="widget flex max-h-[558px] flex-col overflow-hidden">
           <div className="mb-3 flex items-center justify-between">
@@ -116,7 +123,11 @@ export function Summary({
               <button
                 className="btn-link order-2"
                 onClick={() => setSelectedDay(null)}
-                title={selectedDate ? `Voltar ao mês (${selectedDate})` : "Voltar ao mês"}
+                title={
+                  selectedDate
+                    ? `Voltar ao mês (${selectedDate})`
+                    : "Voltar ao mês"
+                }
               >
                 ×
               </button>
@@ -131,23 +142,31 @@ export function Summary({
             </p>
           ) : (
             <div className="tx-list flex-1">
-              {recent.map((t) => (
-                <div key={t.id} className="tx-item">
+              {recent.map((transaction) => (
+                <div key={transaction.id} className="tx-item">
                   <div
-                    className={`tx-icon ${t.type === "income" ? "in" : "out"}`}
+                    className={`tx-icon ${transaction.type === "income" ? "in" : "out"}`}
+                    title={transaction.category || "Outros"}
+                    aria-label={`Categoria: ${transaction.category || "Outros"}`}
                   >
-                    {t.type === "income" ? "+" : "−"}
+                    {pierreCategoryIcon(
+                      transaction.category,
+                      transaction.description,
+                      transaction.type,
+                    )}
                   </div>
                   <div className="tx-info">
-                    <p className="tx-desc">{t.description}</p>
+                    <p className="tx-desc">{transaction.description}</p>
                     <p className="tx-meta">
-                      {typeLabels[t.type]} · {dateBR(t.date)}
+                      {typeLabels[transaction.type]} · {dateBR(transaction.date)}
                     </p>
                   </div>
                   <p
-                    className={`tx-val ${t.type === "income" ? "in" : "out"}`}
+                    className={`tx-val ${transaction.type === "income" ? "in" : "out"}`}
                   >
-                    {t.type === "income" ? "+" : "−"} {currency(t.amount)}
+                    {valuesHidden
+                      ? "••••••"
+                      : `${transaction.type === "income" ? "+" : "−"} ${currency(transaction.amount)}`}
                   </p>
                 </div>
               ))}

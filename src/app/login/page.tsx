@@ -1,27 +1,21 @@
 "use client";
-import { useEffect, useState } from "react";
+
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  registerEmail,
-  resetPassword,
+  completeGoogleRedirect,
   signInEmail,
   signInGoogle,
-  completeGoogleRedirect,
 } from "@/services/auth";
-
-type Mode = "login" | "register" | "reset";
 
 export default function Login() {
   const { user } = useAuth();
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("login");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -31,36 +25,40 @@ export default function Login() {
   useEffect(() => {
     void completeGoogleRedirect().catch((err) => {
       const code = err && typeof err === "object" && "code" in err ? err.code : "";
-      const text = err instanceof Error ? err.message : "Erro ao entrar com Google.";
+      const message = err instanceof Error ? err.message : "Erro ao entrar com Google.";
       setError(
         code === "auth/unauthorized-domain"
           ? "Este domínio ainda não está autorizado no Firebase Authentication."
-          : text.replace("Firebase: ", ""),
+          : message.replace("Firebase: ", ""),
       );
     });
   }, []);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setBusy(true);
     setError("");
-    setMessage("");
     try {
-      if (mode === "reset") {
-        await resetPassword(email);
-        setMessage("Enviamos o link de recuperação para seu e-mail.");
-      } else if (mode === "register") {
-        await registerEmail(name, email, password);
-      } else {
-        await signInEmail(email, password);
-      }
+      await signInEmail(email, password);
     } catch (err) {
-      const text =
-        err instanceof Error ? err.message : "Não foi possível continuar.";
-      setError(text.replace("Firebase: ", ""));
+      const message = err instanceof Error ? err.message : "Não foi possível entrar.";
+      setError(message.replace("Firebase: ", ""));
     } finally {
       setBusy(false);
     }
+  }
+
+  function enterWithGoogle() {
+    void signInGoogle().catch((err) => {
+      const code = err && typeof err === "object" && "code" in err ? err.code : "";
+      const message =
+        code === "auth/unauthorized-domain"
+          ? "Este domínio ainda não está autorizado no Firebase Authentication."
+          : err instanceof Error
+            ? err.message.replace("Firebase: ", "")
+            : "Erro ao entrar com Google.";
+      setError(message);
+    });
   }
 
   return (
@@ -68,119 +66,55 @@ export default function Login() {
       <div className="w-full max-w-[380px] px-6 py-8">
         <header className="mb-8 text-center">
           <h1 className="mb-2 text-[2rem] font-extrabold tracking-[-0.5px] text-[var(--text)]">
-            {mode === "login"
-              ? "Acesse sua conta"
-              : mode === "register"
-                ? "Crie sua conta"
-                : "Recupere sua senha"}
+            Acesse sua conta
           </h1>
           <p className="text-[0.95rem] font-medium text-[var(--text3)]">
-            {mode === "reset"
-              ? "Informe seu e-mail para receber o link."
-              : "Organize suas finanças com clareza."}
+            Organize suas finanças com clareza.
           </p>
         </header>
 
-        <form className="mb-5 flex flex-col gap-3" onSubmit={submit}>
-          {mode === "register" && (
-            <input
-              className="w-full rounded-[12px] border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 text-[0.95rem] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text3)] focus:border-[var(--accent)]"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu nome"
-            />
-          )}
+        <form className="mb-4 flex flex-col gap-3" onSubmit={submit}>
           <input
             className="w-full rounded-[12px] border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 text-[0.95rem] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text3)] focus:border-[var(--accent)]"
             required
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(event) => setEmail(event.target.value)}
             placeholder="voce@email.com"
+            autoComplete="email"
           />
-          {mode !== "reset" && (
-            <div className="relative">
-              <input
-                className="w-full rounded-[12px] border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 pr-20 text-[0.95rem] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text3)] focus:border-[var(--accent)]"
-                required
-                minLength={6}
-                type={show ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo de 6 caracteres"
-              />
-              <button
-                type="button"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.3px] text-[var(--text3)]"
-                onClick={() => setShow(!show)}
-              >
-                {show ? "OCULTAR" : "MOSTRAR"}
-              </button>
-            </div>
-          )}
+          <div className="relative">
+            <input
+              className="w-full rounded-[12px] border border-[var(--card-border)] bg-[var(--card)] px-4 py-3 pr-20 text-[0.95rem] text-[var(--text)] outline-none transition-colors placeholder:text-[var(--text3)] focus:border-[var(--accent)]"
+              required
+              minLength={6}
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Mínimo de 6 caracteres"
+              autoComplete="current-password"
+            />
+            <button
+              type="button"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold uppercase tracking-[0.3px] text-[var(--text3)]"
+              onClick={() => setShowPassword((visible) => !visible)}
+            >
+              {showPassword ? "OCULTAR" : "MOSTRAR"}
+            </button>
+          </div>
           {error && <div className="msg-error">{error}</div>}
-          {message && <div className="msg-success">{message}</div>}
           <button disabled={busy} className="btn-primary w-full justify-center py-3">
-            {busy
-              ? "Aguarde..."
-              : mode === "login"
-                ? "Entrar"
-                : mode === "register"
-                  ? "Criar conta"
-                  : "Enviar link"}
+            {busy ? "Aguarde..." : "Entrar"}
           </button>
         </form>
 
-        {mode === "login" && (
-          <>
-            <button
-              onClick={() =>
-                void signInGoogle().catch((e) => {
-                  const code = e && typeof e === "object" && "code" in e ? e.code : "";
-                  const msg =
-                    code === "auth/unauthorized-domain"
-                      ? "Este domínio ainda não está autorizado no Firebase Authentication."
-                      : e instanceof Error
-                      ? e.message.replace("Firebase: ", "")
-                      : "Erro ao entrar com Google.";
-                  setError(msg);
-                })
-              }
-              className="btn-outline w-full justify-center py-3"
-            >
-              Continuar com Google
-            </button>
-            <button
-              onClick={() => setMode("reset")}
-              className="mt-4 w-full text-center text-sm font-semibold text-[var(--accent)]"
-            >
-              Esqueci minha senha
-            </button>
-            <p className="mt-6 text-center text-sm text-[var(--text2)]">
-              Ainda não tem conta?{" "}
-              <button
-                onClick={() => setMode("register")}
-                className="font-bold text-[var(--accent)]"
-              >
-                Cadastre-se
-              </button>
-            </p>
-          </>
-        )}
-
-        {mode !== "login" && (
-          <button
-            onClick={() => {
-              setMode("login");
-              setError("");
-              setMessage("");
-            }}
-            className="mt-4 w-full text-center text-sm font-bold text-[var(--accent)]"
-          >
-            Voltar para o login
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={enterWithGoogle}
+          className="btn-outline w-full justify-center py-3"
+        >
+          Entrar com Google
+        </button>
       </div>
     </main>
   );

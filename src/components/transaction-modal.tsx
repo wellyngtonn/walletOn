@@ -112,7 +112,7 @@ export function TransactionModal({
               }
               placeholder="Descrição (ex.: Supermercado)"
             />
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="transaction-date-row">
               <input
                 required
                 min="0.01"

@@ -5,12 +5,21 @@ import { currency } from "@/utils/format";
 
 const WEEK_DAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
+const compactCurrency = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  notation: "compact",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 type ExpenseHeatmapProps = {
   items: Transaction[];
   month: number;
   year: number;
   selectedDay: number | null;
   onSelectDay: (day: number | null) => void;
+  valuesHidden: boolean;
 };
 
 export function ExpenseHeatmap({
@@ -19,6 +28,7 @@ export function ExpenseHeatmap({
   year,
   selectedDay,
   onSelectDay,
+  valuesHidden,
 }: ExpenseHeatmapProps) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -35,18 +45,33 @@ export function ExpenseHeatmap({
 
   const values = Object.values(dayTotals);
   const maxValue = values.length ? Math.max(...values) : 1;
-  const total = values.reduce((sum, value) => sum + value, 0);
+  const movementItems = items.filter((transaction) => transaction.pierreId);
+  const incomeTotal = movementItems
+    .filter((transaction) => transaction.type === "income")
+    .reduce((sum, transaction) => sum + transaction.amount, 0);
+  const expenseTotal = movementItems
+    .filter((transaction) => transaction.type !== "income")
+    .reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
 
   return (
     <div className="widget">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.5px] text-[var(--text3)]">
-          Mapa de Gastos
-        </h2>
-        <span className="heatmap-total">
-          {total > 0 ? `Total: ${currency(total)}` : ""}
-        </span>
+      <div className="heatmap-movement">
+        <h3 className="heatmap-movement-title">Movimento Semanal</h3>
+        <div className="heatmap-movement-grid">
+          <div className="heatmap-movement-item">
+            <span>Entradas</span>
+            <strong className="heatmap-movement-income">
+              {valuesHidden ? "••••••" : currency(incomeTotal)}
+            </strong>
+          </div>
+          <div className="heatmap-movement-item">
+            <span>Saídas</span>
+            <strong className="heatmap-movement-expense">
+              {valuesHidden ? "••••••" : currency(expenseTotal)}
+            </strong>
+          </div>
+        </div>
       </div>
 
       <div className="heatmap-wrap" aria-label="Mapa de gastos do mês">
@@ -86,10 +111,14 @@ export function ExpenseHeatmap({
                 className={`hm-cell${day === selectedDay ? " hm-cell--selected" : ""}`}
                 data-day={day}
                 style={{ background, color }}
-                title={`${day}/${month}: ${currency(value)}`}
+                aria-label={`${day}/${month}: ${currency(value)} em gastos`}
+                title={`${day}/${month}: ${currency(value)} em gastos`}
                 onClick={() => onSelectDay(day === selectedDay ? null : day)}
               >
-                {day}
+                <span className="hm-cell-day">{day}</span>
+                <span className="hm-cell-value">
+                  {value > 0 ? compactCurrency.format(value) : "—"}
+                </span>
               </button>
             );
           })}

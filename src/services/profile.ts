@@ -1,5 +1,6 @@
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { selectDefaultPierreAccount } from "@/utils/pierre";
 
 const profilePath = (uid: string) => doc(db, "users", uid);
 
@@ -14,6 +15,7 @@ export interface PierreProfile {
   accountId: string | null;
   accountName: string | null;
   accounts: PierreAccountProfile[];
+  apiKey: string | null;
 }
 
 export function subscribePierreProfile(
@@ -25,26 +27,52 @@ export function subscribePierreProfile(
     profilePath(uid),
     (snapshot) => {
       const data = snapshot.data() || {};
-      const accounts = Array.isArray(data.pierreAccounts)
-        ? data.pierreAccounts.filter(
+      const legacyConfig =
+        data.cfg && typeof data.cfg === "object"
+          ? (data.cfg as Record<string, unknown>)
+          : {};
+      const rawAccounts = Array.isArray(data.pierreAccounts)
+        ? data.pierreAccounts
+        : Array.isArray(legacyConfig.pierreAccounts)
+          ? legacyConfig.pierreAccounts
+          : [];
+      const accounts = rawAccounts.filter(
             (account): account is PierreAccountProfile =>
               Boolean(account) &&
               typeof account.id === "string" &&
               typeof account.name === "string" &&
               typeof account.balance === "number",
-          )
-        : [];
-      const accountId =
-        typeof data.pierreAccountId === "string" ? data.pierreAccountId : null;
+          );
+      const configuredAccountId =
+        typeof data.pierreAccountId === "string"
+          ? data.pierreAccountId
+          : typeof legacyConfig.pierreAccountId === "string"
+            ? legacyConfig.pierreAccountId
+            : null;
+      const selectedAccount =
+        accounts.find((account) => account.id === configuredAccountId) ||
+        selectDefaultPierreAccount(accounts);
+      const configuredBalance =
+        typeof data.pierreBalance === "number"
+          ? data.pierreBalance
+          : typeof legacyConfig.pierreTotalBalance === "number"
+            ? legacyConfig.pierreTotalBalance
+            : null;
       onData({
         balance:
-          accountId && typeof data.pierreBalance === "number"
-            ? data.pierreBalance
-            : null,
-        accountId,
+          selectedAccount?.balance ?? configuredBalance,
+        accountId: selectedAccount?.id ?? configuredAccountId,
         accountName:
-          typeof data.pierreAccountName === "string" ? data.pierreAccountName : null,
+          typeof data.pierreAccountName === "string"
+            ? data.pierreAccountName
+            : selectedAccount?.name || null,
         accounts,
+        apiKey:
+          typeof data.pierreApiKey === "string"
+            ? data.pierreApiKey
+            : typeof legacyConfig.pierreKey === "string"
+              ? legacyConfig.pierreKey
+              : null,
       });
     },
     onError,
@@ -81,6 +109,14 @@ export function savePierreAccountSelection(
       pierreBalance: account.balance,
       pierreBalanceUpdatedAt: serverTimestamp(),
     },
+    { merge: true },
+  );
+}
+
+export function savePierreApiKey(uid: string, apiKey: string) {
+  return setDoc(
+    profilePath(uid),
+    { pierreApiKey: apiKey },
     { merge: true },
   );
 }

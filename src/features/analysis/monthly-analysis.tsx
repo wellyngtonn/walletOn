@@ -13,6 +13,7 @@ import {
 import { TransactionList } from "@/components/transaction-list";
 import type { Transaction, TransactionType } from "@/types";
 import { currency } from "@/utils/format";
+import { filterPierreMovements } from "@/utils/pierre";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -81,23 +82,33 @@ export function MonthlyAnalysis({
   allItems,
   month,
   year,
+  pierreAccountId,
   onEdit,
 }: {
   items: Transaction[];
   allItems: Transaction[];
   month: number;
   year: number;
+  pierreAccountId: string | null;
   onEdit: (transaction: Transaction) => void;
 }) {
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
 
-  const monthItems = useMemo(
-    () => monthTransactions(items, month, year),
-    [items, month, year],
+  const pierreItems = useMemo(
+    () => filterPierreMovements(items, pierreAccountId),
+    [items, pierreAccountId],
   );
-  const pierreMonth = monthItems.filter((transaction) => transaction.pierreId);
+  const pierreAllItems = useMemo(
+    () => filterPierreMovements(allItems, pierreAccountId),
+    [allItems, pierreAccountId],
+  );
+  const monthItems = useMemo(
+    () => monthTransactions(pierreItems, month, year),
+    [month, pierreItems, year],
+  );
+  const pierreMonth = monthItems;
   const categories = useMemo(
     () =>
       Array.from(new Set(monthItems.map(categoryOf))).sort((a, b) =>
@@ -144,10 +155,10 @@ export function MonthlyAnalysis({
     for (let offset = 5; offset >= 0; offset--) {
       const date = new Date(year, month - 1 - offset, 1);
       const periodItems = periodTransactions(
-        allItems,
+        pierreAllItems,
         date.getMonth(),
         date.getFullYear(),
-      ).filter((transaction) => transaction.pierreId);
+      );
       periods.push({
         name: MONTHS[date.getMonth()].slice(0, 3),
         Receitas: periodItems
@@ -159,7 +170,7 @@ export function MonthlyAnalysis({
       });
     }
     return periods;
-  }, [allItems, month, year]);
+  }, [month, pierreAllItems, year]);
 
   const trends = useMemo(() => {
     const currentExpenses = pierreMonth
@@ -167,13 +178,11 @@ export function MonthlyAnalysis({
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const previous = new Date(year, month - 2, 1);
     const previousExpenses = periodTransactions(
-      allItems,
+      pierreAllItems,
       previous.getMonth(),
       previous.getFullYear(),
     )
-      .filter(
-        (transaction) => transaction.pierreId && transaction.type === "expense",
-      )
+      .filter((transaction) => transaction.type === "expense")
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const previousChange = previousExpenses
       ? ((currentExpenses - previousExpenses) / previousExpenses) * 100
@@ -183,10 +192,8 @@ export function MonthlyAnalysis({
     for (let offset = 2; offset >= 0; offset--) {
       const date = new Date(year, month - 1 - offset, 1);
       threeMonths.push(
-        periodTransactions(allItems, date.getMonth(), date.getFullYear())
-          .filter(
-            (transaction) => transaction.pierreId && transaction.type === "expense",
-          )
+        periodTransactions(pierreAllItems, date.getMonth(), date.getFullYear())
+          .filter((transaction) => transaction.type === "expense")
           .reduce((sum, transaction) => sum + transaction.amount, 0),
       );
     }
@@ -195,7 +202,7 @@ export function MonthlyAnalysis({
       : 0;
 
     return { currentExpenses, previousChange, growth };
-  }, [allItems, month, pierreMonth, year]);
+  }, [month, pierreAllItems, pierreMonth, year]);
 
   const forecast = useMemo(() => {
     const daysInMonth = new Date(year, month, 0).getDate();

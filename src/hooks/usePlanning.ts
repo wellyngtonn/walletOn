@@ -8,22 +8,33 @@ import {
 } from "@/services/transactions";
 import type { PlannedTransaction, Recurrence } from "@/types";
 
+type PlanningCache = {
+  plans: PlannedTransaction[];
+  recurrences: Recurrence[];
+};
+
+const planningCache = new Map<string, PlanningCache>();
+
 export function usePlanning() {
   const { user } = useAuth();
+  const uid = user?.uid;
   const [plans, setPlans] = useState<PlannedTransaction[]>([]);
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user) {
+    if (!uid) {
       setPlans([]);
       setRecurrences([]);
       setLoading(false);
       return;
     }
 
-    setLoading(true);
+    const cached = planningCache.get(uid);
+    setPlans(cached?.plans || []);
+    setRecurrences(cached?.recurrences || []);
+    setLoading(!cached);
     setError("");
     let plansLoaded = false;
     let recurrencesLoaded = false;
@@ -35,8 +46,12 @@ export function usePlanning() {
       setLoading(false);
     };
     const unsubscribePlans = subscribePlans(
-      user.uid,
+      uid,
       (items) => {
+        planningCache.set(uid, {
+          plans: items,
+          recurrences: planningCache.get(uid)?.recurrences || [],
+        });
         setPlans(items);
         plansLoaded = true;
         finishLoading();
@@ -44,8 +59,12 @@ export function usePlanning() {
       onError,
     );
     const unsubscribeRecurrences = subscribeRecurrences(
-      user.uid,
+      uid,
       (items) => {
+        planningCache.set(uid, {
+          plans: planningCache.get(uid)?.plans || [],
+          recurrences: items,
+        });
         setRecurrences(items);
         recurrencesLoaded = true;
         finishLoading();
@@ -56,7 +75,7 @@ export function usePlanning() {
       unsubscribePlans();
       unsubscribeRecurrences();
     };
-  }, [user]);
+  }, [uid]);
 
   return { plans, recurrences, loading, error };
 }

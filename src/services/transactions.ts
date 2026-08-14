@@ -74,6 +74,23 @@ export async function listTransactions(uid: string): Promise<Transaction[]> {
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Transaction);
 }
 
+export async function listPierreTransactions(
+  uid: string,
+  accountId: string,
+  fromDate: string,
+  toDate: string,
+): Promise<Transaction[]> {
+  const q = query(
+    path(uid),
+    where("accountId", "==", accountId),
+    where("date", ">=", fromDate),
+    where("date", "<=", toDate),
+    orderBy("date", "desc"),
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Transaction);
+}
+
 export async function listPlans(uid: string): Promise<PlannedTransaction[]> {
   const snapshot = await getDocs(plansPath(uid));
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as PlannedTransaction);

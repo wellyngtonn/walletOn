@@ -62,6 +62,36 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['limit']) || (request.resource.data.limit is int && request.resource.data.limit >= 1))
         && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool);
     }
+    function validShoppingItem(uid) {
+      return request.resource.data.keys().hasOnly(['userId','name','qty','price','done','createdDate','completedDate','order','createdAt','updatedAt'])
+        && request.resource.data.keys().hasAll(['userId','name','qty','price','done','createdDate','order','updatedAt'])
+        && request.resource.data.userId == uid
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.qty is int
+        && request.resource.data.qty >= 1
+        && request.resource.data.price is number
+        && request.resource.data.price >= 0
+        && request.resource.data.done is bool
+        && request.resource.data.createdDate is string
+        && request.resource.data.createdDate.size() == 10
+        && request.resource.data.order is int
+        && request.resource.data.order >= 0
+        && (!request.resource.data.keys().hasAny(['completedDate']) || request.resource.data.completedDate == null || request.resource.data.completedDate is string);
+    }
+    function validShoppingHistory(uid) {
+      return request.resource.data.keys().hasOnly(['id','userId','date','total','items','createdAt'])
+        && request.resource.data.keys().hasAll(['id','userId','date','total','items'])
+        && request.resource.data.userId == uid
+        && request.resource.data.id is string
+        && request.resource.data.date is string
+        && request.resource.data.date.size() == 10
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0
+        && request.resource.data.items is list
+        && (!request.resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt is timestamp);
+    }
     match /users/{uid} {
       allow read, create, update: if isOwner(uid);
       allow delete: if false;
@@ -76,6 +106,14 @@ service cloud.firestore {
       match /recurrences/{recurrenceId} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validRecurrence(uid);
+      }
+      match /shopping/{itemId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validShoppingItem(uid);
+      }
+      match /shoppingHistory/{historyId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && validShoppingHistory(uid);
       }
     }
   }

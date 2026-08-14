@@ -1,11 +1,15 @@
 "use client";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { AuthGuard } from "./auth-guard";
 import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
 import { useAuth } from "@/hooks/useAuth";
 import { usePierreBalance } from "@/hooks/usePierreBalance";
+import {
+  PIERRE_API_KEY_STORAGE,
+  usePierreAutoSync,
+} from "@/hooks/usePierreAutoSync";
 import { useTransactions } from "@/hooks/useTransactions";
 import type { Transaction } from "@/types";
 
@@ -36,13 +40,29 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [pierreApiKey, setPierreApiKey] = useState<string | null>(null);
   const data = useTransactions(user?.uid, month, year);
   const {
     balance: pierreBalance,
     accountId: pierreAccountId,
     accountName: pierreAccountName,
+    apiKey: pierreProfileApiKey,
+    loading: pierreProfileLoading,
     error: balanceError,
   } = usePierreBalance(user?.uid);
+
+  useEffect(() => {
+    setPierreApiKey(
+      window.localStorage.getItem(PIERRE_API_KEY_STORAGE),
+    );
+  }, [user?.uid]);
+
+  usePierreAutoSync({
+    uid: user?.uid,
+    apiKey: pierreProfileApiKey || pierreApiKey,
+    preferredAccountId: pierreAccountId,
+    profileLoading: pierreProfileLoading,
+  });
 
   function openEdit(t: Transaction) {
     setEditing(t);
@@ -73,7 +93,7 @@ function Inner({ children }: { children: React.ReactNode }) {
     >
       <Sidebar />
       <main
-        className="min-h-screen px-4 pb-32 pt-20 md:px-7 md:pt-7"
+        className="app-shell-main min-h-screen px-4 pb-32 pt-20 md:px-7 md:pt-7"
       >
         <header className="mb-5 flex items-center justify-end">
           <div className="flex items-center gap-2">

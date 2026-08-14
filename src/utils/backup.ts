@@ -1,6 +1,7 @@
 import type {
   PlannedTransactionInput,
   RecurrenceInput,
+  ShoppingItemInput,
   TransactionInput,
   TransactionType,
 } from "../types";
@@ -11,6 +12,7 @@ export type BackupData = {
   tx: unknown[];
   plan: unknown[];
   rec: unknown[];
+  shop: unknown[];
 };
 
 export type NormalizedTransaction = {
@@ -27,6 +29,12 @@ export type NormalizedRecurrence = {
   oldId: string;
   id?: string;
   data: RecurrenceInput;
+};
+
+export type NormalizedShoppingItem = {
+  oldId: string;
+  id?: string;
+  data: ShoppingItemInput;
 };
 
 function recordOf(value: unknown): BackupRecord | null {
@@ -88,15 +96,16 @@ function importId(kind: string, value: unknown) {
 }
 
 export function normalizeBackup(value: unknown): BackupData {
-  if (Array.isArray(value)) return { tx: value, plan: [], rec: [] };
+  if (Array.isArray(value)) return { tx: value, plan: [], rec: [], shop: [] };
   const data = recordOf(value);
-  if (!data || !Array.isArray(data.tx)) {
+  if (!data || (!Array.isArray(data.tx) && !Array.isArray(data.shop))) {
     throw new Error("O backup precisa conter uma lista de transações em tx.");
   }
   return {
-    tx: data.tx,
+    tx: Array.isArray(data.tx) ? data.tx : [],
     plan: Array.isArray(data.plan) ? data.plan : [],
     rec: Array.isArray(data.rec) ? data.rec : [],
+    shop: Array.isArray(data.shop) ? data.shop : [],
   };
 }
 
@@ -182,6 +191,36 @@ export function normalizeRecurrence(
   return {
     oldId: stringValue(item.id),
     id: importId("rec", item.id),
+    data,
+  };
+}
+
+export function normalizeShoppingItem(
+  value: unknown,
+): NormalizedShoppingItem | null {
+  const item = recordOf(value);
+  if (!item || item.id == null) return null;
+  const name = stringValue(item.name ?? item.description ?? item.desc);
+  const createdDate = dateValue(item.createdDate ?? item.data ?? item.date);
+  if (!name || !createdDate) return null;
+  const quantity = Math.max(
+    1,
+    Math.trunc(Number(item.qty ?? item.quantity ?? item.qtd) || 1),
+  );
+  const price = amountValue(item.price ?? item.preco ?? item.amount);
+  const completedDate = dateValue(item.completedDate ?? item.dataConclusao);
+  const data: ShoppingItemInput = {
+    name: name.slice(0, 120),
+    qty: quantity,
+    price,
+    done: item.done === true || item.completed === true,
+    createdDate,
+    completedDate: completedDate || null,
+    order: Math.max(0, Math.trunc(Number(item.order) || 0)),
+  };
+  return {
+    oldId: stringValue(item.id),
+    id: importId("shop", item.id),
     data,
   };
 }

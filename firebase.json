@@ -7,7 +7,9 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "site": "wallet-on-c0b05",
     "public": "out",
+    "predeploy": ["npm run build"],
     "cleanUrls": true,
     "trailingSlash": true,
     "ignore": [

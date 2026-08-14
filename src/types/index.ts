@@ -63,3 +63,33 @@ export type RecurrenceInput = Omit<
   Recurrence,
   "id" | "userId" | "createdAt" | "updatedAt"
 >;
+
+export interface ShoppingItem {
+  id: string;
+  userId: string;
+  name: string;
+  qty: number;
+  price: number;
+  done: boolean;
+  createdDate: string;
+  completedDate?: string | null;
+  order: number;
+}
+
+export type ShoppingItemInput = Omit<ShoppingItem, "id" | "userId">;
+
+export interface ShoppingHistoryItem {
+  name: string;
+  qty: number;
+  price?: number;
+}
+
+export interface ShoppingHistory {
+  id: string;
+  userId: string;
+  date: string;
+  total: number;
+  items: ShoppingHistoryItem[];
+}
+
+export type ShoppingHistoryInput = Omit<ShoppingHistory, "id" | "userId">;

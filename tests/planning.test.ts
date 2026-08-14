@@ -5,6 +5,7 @@ import {
   recurrenceDate,
   recurrenceExpired,
   recurrenceScheduled,
+  recurrenceStarted,
 } from "../src/utils/planning";
 
 function recurrence(
@@ -36,10 +37,26 @@ test("recorrência trimestral só agenda os meses corretos", () => {
   assert.equal(recurrenceScheduled(item, 2026, 4), true);
 });
 
+test("recorrência futura não aparece antes do mês de início", () => {
+  const item = recurrence({ startDate: "2026-09-01", originalDay: 1 });
+  assert.equal(recurrenceStarted(item, 2026, 8), false);
+  assert.equal(recurrenceScheduled(item, 2026, 8), false);
+  assert.equal(recurrenceStarted(item, 2026, 9), true);
+  assert.equal(recurrenceScheduled(item, 2026, 9), true);
+});
+
 test("limite encerra a recorrência após o número de ocorrências", () => {
   const item = recurrence({ limit: 2 });
   assert.equal(recurrenceExpired(item, 2026, 1), false);
   assert.equal(recurrenceExpired(item, 2026, 2), false);
   assert.equal(recurrenceExpired(item, 2026, 3), true);
   assert.equal(recurrenceScheduled(item, 2026, 3), false);
+});
+
+test("future recurrence remains hidden before its start month", () => {
+  const item = recurrence({ startDate: "2026-09-15", originalDay: 15 });
+  assert.equal(recurrenceStarted(item, 2026, 8), false);
+  assert.equal(recurrenceScheduled(item, 2026, 8), false);
+  assert.equal(recurrenceStarted(item, 2026, 9), true);
+  assert.equal(recurrenceScheduled(item, 2026, 9), true);
 });

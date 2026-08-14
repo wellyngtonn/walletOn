@@ -1,7 +1,7 @@
 "use client";
 import { Menu } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -9,11 +9,13 @@ const links = [
   { href: "/resumo", label: "Painel" },
   { href: "/analise", label: "Análise Mensal" },
   { href: "/planejamento", label: "Plano" },
+  { href: "/compras", label: "Lista de Compras" },
   { href: "/configuracoes", label: "Ajustes" },
 ];
 
 export function Sidebar() {
   const path = usePathname();
+  const router = useRouter();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const initial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "?";
@@ -38,7 +40,7 @@ export function Sidebar() {
       )}
 
       <aside
-        className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 pt-20 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)] md:pt-4"
+        className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 pt-20 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
@@ -47,8 +49,12 @@ export function Sidebar() {
           {links.map(({ href, label }) => (
             <Link
               onClick={() => setOpen(false)}
+              onMouseEnter={() => router.prefetch(href)}
+              onFocus={() => router.prefetch(href)}
+              onTouchStart={() => router.prefetch(href)}
               key={href}
               href={href}
+              prefetch
               className="rounded-[12px] px-3.5 py-[11px] text-[0.9rem] font-semibold text-[var(--text2)] transition-all duration-[180ms] hover:bg-[var(--bg)] hover:text-[var(--text)]"
               style={
                 path === href

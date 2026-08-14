@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import {
+  markPierreSyncComplete,
+  PIERRE_API_KEY_STORAGE,
+} from "@/hooks/usePierreAutoSync";
 import { usePierreBalance } from "@/hooks/usePierreBalance";
 import {
   createTransaction,
@@ -18,7 +22,9 @@ import {
 import {
   savePierreAccountSelection,
   savePierreAccounts,
+  savePierreApiKey,
 } from "@/services/profile";
+import { selectDefaultPierreAccount } from "@/utils/pierre";
 
 const MONTHS = [
   "Janeiro",
@@ -51,6 +57,7 @@ export function PierreImport() {
   const {
     accounts: savedAccounts,
     accountId: savedAccountId,
+    apiKey: savedApiKey,
   } = usePierreBalance(user?.uid);
   const [key, setKey] = useState("");
   const [accounts, setAccounts] = useState<PierreAccount[]>([]);
@@ -63,8 +70,10 @@ export function PierreImport() {
   const [periodoStatus, setPeriodoStatus] = useState("");
 
   useEffect(() => {
-    setKey("");
-  }, []);
+    setKey(
+      savedApiKey || window.localStorage.getItem(PIERRE_API_KEY_STORAGE) || "",
+    );
+  }, [savedApiKey]);
 
   useEffect(() => {
     setAccounts(savedAccounts);
@@ -121,7 +130,7 @@ export function PierreImport() {
     const preferredId = selectedAccountId || savedAccountId;
     const selectedAccount =
       fetchedAccounts.find((account) => account.id === preferredId) ||
-      fetchedAccounts[0];
+      selectDefaultPierreAccount(fetchedAccounts);
     if (!selectedAccount) throw new Error("Nenhuma carteira encontrada no Pierre.");
 
     setAccounts(fetchedAccounts);
@@ -154,7 +163,11 @@ export function PierreImport() {
     setBusy(true);
     try {
       const result = await validatePierreKey(key.trim());
-      if (result.ok) await syncPierreBalance(key.trim());
+      if (result.ok) {
+        window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
+        if (user) await savePierreApiKey(user.uid, key.trim());
+        await syncPierreBalance(key.trim());
+      }
       setToast(result.message);
     } finally {
       setBusy(false);
@@ -173,6 +186,8 @@ export function PierreImport() {
     try {
       const validation = await validatePierreKey(key.trim());
       if (!validation.ok) throw new Error(validation.message);
+      window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
+      await savePierreApiKey(user.uid, key.trim());
 
       await triggerPierreUpdate(key.trim());
       await syncPierreBalance(key.trim());
@@ -186,6 +201,7 @@ export function PierreImport() {
         today.toISOString().slice(0, 10),
       );
       const imported = await importItems(items, await loadExistingIds());
+      markPierreSyncComplete();
 
       setToast(
         imported > 0
@@ -242,6 +258,8 @@ export function PierreImport() {
     try {
       const validation = await validatePierreKey(key.trim());
       if (!validation.ok) throw new Error(validation.message);
+      window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
+      await savePierreApiKey(user.uid, key.trim());
       await syncPierreBalance(key.trim());
     } catch (error) {
       setToast(errorMessage(error));
@@ -268,6 +286,7 @@ export function PierreImport() {
     setShowPeriodo(false);
     setSelectedMonths(new Set());
     setPeriodoStatus("");
+    if (!errors) markPierreSyncComplete();
     setToast(
       `${total} transações de ${meses.length} ${meses.length === 1 ? "mês" : "meses"} importadas${errors ? ` (${errors} erro${errors === 1 ? "" : "s"})` : ""}.`,
     );
