@@ -5,14 +5,6 @@ import { currency } from "@/utils/format";
 
 const WEEK_DAYS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
-const compactCurrency = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-  notation: "compact",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
 type ExpenseHeatmapProps = {
   items: Transaction[];
   month: number;
@@ -50,12 +42,12 @@ export function ExpenseHeatmap({
     .filter((transaction) => transaction.type === "income")
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const expenseTotal = movementItems
-    .filter((transaction) => transaction.type !== "income")
+    .filter((transaction) => transaction.type === "expense")
     .reduce((sum, transaction) => sum + transaction.amount, 0);
   const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
 
   return (
-    <div className="widget">
+    <div className="widget heatmap-widget">
       <div className="heatmap-movement">
         <h3 className="heatmap-movement-title">Movimento Semanal</h3>
         <div className="heatmap-movement-grid">
@@ -88,6 +80,11 @@ export function ExpenseHeatmap({
             }
 
             const value = dayTotals[day] || 0;
+            const displayValue = valuesHidden
+              ? "••••••"
+              : value > 0
+                ? currency(value)
+                : "—";
             const intensity = maxValue > 0 ? value / maxValue : 0;
             let background = "var(--border-soft)";
             let color = "var(--text3)";
@@ -111,14 +108,12 @@ export function ExpenseHeatmap({
                 className={`hm-cell${day === selectedDay ? " hm-cell--selected" : ""}`}
                 data-day={day}
                 style={{ background, color }}
-                aria-label={`${day}/${month}: ${currency(value)} em gastos`}
-                title={`${day}/${month}: ${currency(value)} em gastos`}
+                aria-label={`${day}/${month}: ${displayValue} em gastos`}
+                title={`${day}/${month}: ${displayValue} em gastos`}
                 onClick={() => onSelectDay(day === selectedDay ? null : day)}
               >
                 <span className="hm-cell-day">{day}</span>
-                <span className="hm-cell-value">
-                  {value > 0 ? compactCurrency.format(value) : "—"}
-                </span>
+                <span className="hm-cell-value">{displayValue}</span>
               </button>
             );
           })}

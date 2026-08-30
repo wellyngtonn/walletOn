@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Barcode, Check, Copy, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Barcode, Camera, Check, Copy, ScanLine, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import {
+  archiveShoppingItems,
   createShoppingItem,
-  createShoppingHistory,
   deleteShoppingItem,
-  deleteShoppingItemsBatch,
   ensureShoppingHistory,
   updateShoppingItem,
 } from "@/services/shopping";
@@ -21,6 +20,16 @@ import { currency, dateBR } from "@/utils/format";
 import { INITIAL_SHOPPING_HISTORY } from "@/features/shopping/historical-data";
 
 type ShopTab = "ativa" | "historico";
+
+type BarcodeDetection = { rawValue?: string };
+type BarcodeDetectorLike = {
+  detect: (source: HTMLVideoElement) => Promise<BarcodeDetection[]>;
+};
+type BarcodeDetectorConstructor = new (options?: {
+  formats?: string[];
+}) => BarcodeDetectorLike;
+
+const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
 
 function todayString() {
   return new Date().toISOString().slice(0, 10);
@@ -56,14 +65,47 @@ export function ShoppingPage() {
   const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState("");
+  const [archiving, setArchiving] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
   const qtyRef = useRef<HTMLInputElement>(null);
   const priceRef = useRef<HTMLInputElement>(null);
   const copyFeedbackTimer = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const scannerStreamRef = useRef<MediaStream | null>(null);
+  const scannerTimerRef = useRef<number | null>(null);
+  const lookupControllerRef = useRef<AbortController | null>(null);
+  const lookupRequestRef = useRef(0);
+  const barcodeCacheRef = useRef<Map<string, string | null>>(new Map());
 
   useEffect(() => () => {
     if (copyFeedbackTimer.current) window.clearTimeout(copyFeedbackTimer.current);
   }, []);
+
+  const releaseScanner = useCallback(() => {
+    if (scannerTimerRef.current !== null) {
+      window.clearTimeout(scannerTimerRef.current);
+      scannerTimerRef.current = null;
+    }
+    scannerStreamRef.current?.getTracks().forEach((track) => track.stop());
+    scannerStreamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  const closeScanner = useCallback(() => {
+    releaseScanner();
+    setScannerOpen(false);
+    setScannerError("");
+  }, [releaseScanner]);
+
+  useEffect(() => () => {
+    releaseScanner();
+    lookupControllerRef.current?.abort();
+  }, [releaseScanner]);
 
   const activeItems = useMemo(
     () =>
@@ -121,43 +163,136 @@ export function ShoppingPage() {
     });
   }, [user]);
 
+  const lookupProduct = useCallback(async (rawCode: string) => {
+    const code = rawCode.replace(/\D/g, "");
+    if (code.length < 8 || code.length > 14) return;
+
+    const cachedName = barcodeCacheRef.current.get(code);
+    if (cachedName !== undefined) {
+      if (cachedName) {
+        setName(cachedName);
+        setBarcodeStatus("ok");
+        nameRef.current?.focus();
+      } else {
+        setBarcodeStatus("warn");
+      }
+      return;
+    }
+
+    lookupControllerRef.current?.abort();
+    const controller = new AbortController();
+    lookupControllerRef.current = controller;
+    const requestId = ++lookupRequestRef.current;
+    setBarcodeStatus("loading");
+
+    try {
+      const response = await fetch(
+        `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}?fields=product_name,product_name_pt,abbreviated_product_name`,
+        { signal: controller.signal },
+      );
+      if (!response.ok) throw new Error("barcode");
+      const data = await response.json();
+      const product = data.product;
+      const productName = String(
+        product?.product_name_pt || product?.product_name || product?.abbreviated_product_name || "",
+      ).trim();
+      if (requestId !== lookupRequestRef.current) return;
+      barcodeCacheRef.current.set(code, productName || null);
+      if (!productName) {
+        setBarcodeStatus("warn");
+        return;
+      }
+      setName(productName);
+      setBarcodeStatus("ok");
+      nameRef.current?.focus();
+    } catch {
+      if (!controller.signal.aborted && requestId === lookupRequestRef.current) {
+        setBarcodeStatus("err");
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (barcode.length < 8 || barcode.length > 14) {
       setBarcodeStatus("");
       return;
     }
+    const timer = window.setTimeout(() => void lookupProduct(barcode), 120);
+    return () => window.clearTimeout(timer);
+  }, [barcode, lookupProduct]);
 
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setBarcodeStatus("loading");
+  useEffect(() => {
+    if (!scannerOpen) return;
+
+    let cancelled = false;
+    const detectorConstructor = (
+      window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }
+    ).BarcodeDetector;
+
+    if (!detectorConstructor) {
+      setScannerError("A leitura por câmera não é suportada neste navegador. Use o campo ou um leitor físico.");
+      return () => undefined;
+    }
+    const Detector = detectorConstructor;
+
+    async function startScanner() {
       try {
-        const response = await fetch(
-          `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode.replace(/\D/g, ""))}?fields=product_name,product_name_pt,abbreviated_product_name`,
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error("barcode");
-        const data = await response.json();
-        const product = data.product;
-        const productName = String(
-          product?.product_name_pt || product?.product_name || product?.abbreviated_product_name || "",
-        ).trim();
-        if (!productName) {
-          setBarcodeStatus("warn");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: "environment" },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
           return;
         }
-        setName(productName);
-        setBarcodeStatus("ok");
-        nameRef.current?.focus();
-      } catch {
-        if (!controller.signal.aborted) setBarcodeStatus("err");
-      }
-    }, 600);
+        scannerStreamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) throw new Error("camera-view");
+        video.srcObject = stream;
+        await video.play();
+        const detector = new Detector({ formats: BARCODE_FORMATS });
 
+        const scan = async () => {
+          if (cancelled || !videoRef.current) return;
+          try {
+            const detections = await detector.detect(videoRef.current);
+            const code = detections
+              .map((detection) => detection.rawValue || "")
+              .map((value) => value.replace(/\D/g, ""))
+              .find((value) => value.length >= 8 && value.length <= 14);
+            if (code) {
+              setBarcode(code);
+              closeScanner();
+              return;
+            }
+          } catch {
+            // A frame can fail while the camera is adjusting focus; continue scanning.
+          }
+          if (!cancelled) scannerTimerRef.current = window.setTimeout(() => void scan(), 80);
+        };
+
+        void scan();
+      } catch (exception) {
+        if (!cancelled) {
+          setScannerError(
+            exception instanceof DOMException && exception.name === "NotAllowedError"
+              ? "Permita o acesso à câmera para ler o código."
+              : "Não foi possível iniciar a câmera. Confira as permissões do navegador.",
+          );
+        }
+      }
+    }
+
+    void startScanner();
     return () => {
-      window.clearTimeout(timer);
-      controller.abort();
+      cancelled = true;
+      releaseScanner();
     };
-  }, [barcode]);
+  }, [closeScanner, releaseScanner, scannerOpen]);
 
   async function addItem() {
     if (!user || !name.trim()) {
@@ -208,43 +343,35 @@ export function ShoppingPage() {
 
   async function toggleItem(item: ShoppingItem) {
     if (!user) return;
-    await updateShoppingItem(user.uid, item.id, itemInput(item, {
-      done: !item.done,
-      completedDate: !item.done ? todayString() : null,
-    }));
+    try {
+      await updateShoppingItem(user.uid, item.id, itemInput(item, {
+        done: !item.done,
+        completedDate: !item.done ? todayString() : null,
+      }));
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar o item.");
+    }
   }
 
   async function removeItem(item: ShoppingItem) {
     if (!user) return;
-    await deleteShoppingItem(user.uid, item.id);
+    try {
+      await deleteShoppingItem(user.uid, item.id);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir o item.");
+    }
   }
 
   async function archiveCompleted() {
-    if (!user || !completedItems.length) return;
-    const groups = new Map<string, ShoppingItem[]>();
-    completedItems.forEach((item) => {
-      const date = item.completedDate || todayString();
-      groups.set(date, [...(groups.get(date) || []), item]);
-    });
-
+    if (!user || !completedItems.length || archiving) return;
+    setArchiving(true);
     try {
-      await Promise.all(
-        [...groups.entries()].map(([date, groupedItems]) =>
-          createShoppingHistory(user.uid, {
-            date,
-            total: groupedItems.reduce((sum, item) => sum + item.qty * item.price, 0),
-            items: groupedItems.map((item) => ({
-              name: item.name,
-              qty: item.qty,
-              price: item.price,
-            })),
-          }),
-        ),
-      );
-      await deleteShoppingItemsBatch(user.uid, completedItems.map((item) => item.id));
+      await archiveShoppingItems(user.uid, completedItems);
       setActionError("");
     } catch (exception) {
       setActionError(exception instanceof Error ? exception.message : "Não foi possível arquivar a lista.");
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -294,8 +421,12 @@ export function ShoppingPage() {
       return;
     }
     setActionError("");
-    await updateShoppingItem(user.uid, item.id, itemInput(item, { price: parsedPrice }));
-    setEditingPriceId(null);
+    try {
+      await updateShoppingItem(user.uid, item.id, itemInput(item, { price: parsedPrice }));
+      setEditingPriceId(null);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar o preço.");
+    }
   }
 
   if (loading) return <p className="text-[var(--text3)]">Carregando lista de compras...</p>;
@@ -307,7 +438,7 @@ export function ShoppingPage() {
         <h2 className="sec-title">Lista de Compras</h2>
         <div className="shop-header-buttons">
           <button className="btn-outline btn-sm" type="button" onClick={() => setTab("historico")}>📋 Histórico</button>
-          <button className="btn-outline btn-sm" type="button" onClick={() => void archiveCompleted()}>Arquivar concluídas</button>
+          <button className="btn-outline btn-sm" type="button" onClick={() => void archiveCompleted()} disabled={archiving || !completedItems.length}>{archiving ? "Arquivando..." : "Arquivar concluídas"}</button>
         </div>
       </div>
 
@@ -328,6 +459,18 @@ export function ShoppingPage() {
             >
               <div className="barcode-wrap">
                 <Barcode className="barcode-icon" size={16} aria-hidden="true" />
+                <button
+                  className="barcode-scan-button"
+                  type="button"
+                  onClick={() => {
+                    setScannerError("");
+                    setScannerOpen(true);
+                  }}
+                  aria-label="Ler código de barras com a câmera"
+                  title="Ler com câmera"
+                >
+                  <ScanLine size={16} aria-hidden="true" />
+                </button>
                 <input className="shop-input shop-input--barcode" value={barcode} onChange={(event) => setBarcode(event.target.value.replace(/\D/g, ""))} onKeyDown={(event) => moveToNextInput(event, nameRef)} placeholder="Cód. de barras" inputMode="numeric" enterKeyHint="next" maxLength={14} />
                 {barcodeStatus && <span className={`barcode-status ${barcodeStatus}`} aria-label={`Busca de código: ${barcodeStatus}`}>{barcodeStatus === "loading" ? "●" : barcodeStatus === "ok" ? "✓" : barcodeStatus === "warn" ? "?" : "×"}</span>}
               </div>
@@ -393,6 +536,29 @@ export function ShoppingPage() {
               </div>
             ))}
           </div></div>
+        </div>
+      )}
+
+      {scannerOpen && (
+        <div className="barcode-scanner-overlay" role="presentation">
+          <div className="barcode-scanner-modal" role="dialog" aria-modal="true" aria-labelledby="barcode-scanner-title">
+            <div className="barcode-scanner-header">
+              <div>
+                <h3 id="barcode-scanner-title" className="barcode-scanner-title">
+                  <Camera size={17} aria-hidden="true" /> Ler código
+                </h3>
+                <p className="barcode-scanner-caption">Aponte a câmera para o código do produto.</p>
+              </div>
+              <button className="modal-close" type="button" onClick={closeScanner} aria-label="Fechar leitor">
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+            <div className="barcode-scanner-viewfinder">
+              <video ref={videoRef} autoPlay muted playsInline />
+              <span className="barcode-scanner-guide" aria-hidden="true" />
+            </div>
+            {scannerError ? <p className="msg-error barcode-scanner-error">{scannerError}</p> : <p className="barcode-scanner-hint">A leitura começa automaticamente.</p>}
+          </div>
         </div>
       )}
     </section>

@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteTransaction } from "@/services/transactions";
 import type { Transaction, TransactionType } from "@/types";
@@ -21,10 +22,15 @@ export function TransactionList({
   showActions?: boolean;
 }) {
   const { user } = useAuth();
+  const [error, setError] = useState("");
 
   async function remove(id: string) {
-    if (user && confirm("Excluir este lançamento?"))
+    if (!user || !confirm("Excluir este lançamento?")) return;
+    try {
       await deleteTransaction(user.uid, id);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "Não foi possível excluir o lançamento.");
+    }
   }
 
   if (!items.length)
@@ -35,7 +41,9 @@ export function TransactionList({
     );
 
   return (
-    <div className="tx-list">
+    <>
+      {error && <div className="msg-error mb-2">{error}</div>}
+      <div className="tx-list">
       {items.map((t) => (
         <div key={t.id} className="tx-item">
           <div
@@ -69,6 +77,7 @@ export function TransactionList({
           )}
         </div>
       ))}
-    </div>
+      </div>
+    </>
   );
 }

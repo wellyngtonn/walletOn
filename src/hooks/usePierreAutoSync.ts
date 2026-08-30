@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { syncPierreData } from "@/services/pierre-sync";
 
-export const PIERRE_API_KEY_STORAGE = "wallet-pierre-api-key";
 const PIERRE_SYNC_EVENT = "wallet-pierre-sync-complete";
 const PIERRE_SYNC_STORAGE = "wallet-pierre-sync-complete";
 
@@ -30,12 +29,12 @@ export function usePierreSyncStatus() {
 
 export function usePierreAutoSync({
   uid,
-  apiKey,
+  hasApiKey,
   preferredAccountId,
   profileLoading,
 }: {
   uid?: string;
-  apiKey: string | null;
+  hasApiKey: boolean;
   preferredAccountId?: string | null;
   profileLoading: boolean;
 }) {
@@ -44,15 +43,15 @@ export function usePierreAutoSync({
   useEffect(() => {
     if (
       !uid ||
-      !apiKey ||
+      !hasApiKey ||
       profileLoading ||
       startedForUid.current === uid
     ) return;
     startedForUid.current = uid;
-    void syncPierreData(uid, apiKey, preferredAccountId)
+    void syncPierreData(preferredAccountId)
       .then(() => markPierreSyncComplete())
       .catch(() => {
         // A falha silenciosa evita bloquear a abertura do app.
       });
-  }, [apiKey, preferredAccountId, profileLoading, uid]);
+  }, [hasApiKey, preferredAccountId, profileLoading, uid]);
 }

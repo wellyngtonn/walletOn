@@ -95,6 +95,9 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, create, update: if isOwner(uid);
       allow delete: if false;
+      match /private/{documentId} {
+        allow read, write: if false;
+      }
       match /transactions/{transactionId} {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && validTransaction(uid);

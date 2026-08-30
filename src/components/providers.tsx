@@ -5,6 +5,7 @@ import { initAnalytics } from "@/lib/firebase/config";
 export function Providers({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     void initAnalytics();
+    window.localStorage.removeItem("wallet-pierre-api-key");
     if ("serviceWorker" in navigator)
       void navigator.serviceWorker.register("/sw.js");
   }, []);

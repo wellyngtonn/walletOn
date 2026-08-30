@@ -12,6 +12,7 @@ export default function Page() {
     pierreBalance,
     pierreAccountId,
     pierreAccountName,
+    openEdit,
   } = useDashboard();
   if (loading) return <p className="text-[var(--text3)]">Carregando dados...</p>;
   return (
@@ -24,6 +25,7 @@ export default function Page() {
         pierreBalance={pierreBalance}
         pierreAccountId={pierreAccountId}
         pierreAccountName={pierreAccountName}
+        onEdit={openEdit}
       />
     </>
   );

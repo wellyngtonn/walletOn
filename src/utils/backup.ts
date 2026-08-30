@@ -1,6 +1,7 @@
 import type {
   PlannedTransactionInput,
   RecurrenceInput,
+  ShoppingHistoryInput,
   ShoppingItemInput,
   TransactionInput,
   TransactionType,
@@ -13,6 +14,7 @@ export type BackupData = {
   plan: unknown[];
   rec: unknown[];
   shop: unknown[];
+  history: unknown[];
 };
 
 export type NormalizedTransaction = {
@@ -35,6 +37,11 @@ export type NormalizedShoppingItem = {
   oldId: string;
   id?: string;
   data: ShoppingItemInput;
+};
+
+export type NormalizedShoppingHistory = {
+  id?: string;
+  data: ShoppingHistoryInput;
 };
 
 function recordOf(value: unknown): BackupRecord | null {
@@ -96,9 +103,14 @@ function importId(kind: string, value: unknown) {
 }
 
 export function normalizeBackup(value: unknown): BackupData {
-  if (Array.isArray(value)) return { tx: value, plan: [], rec: [], shop: [] };
+  if (Array.isArray(value)) return { tx: value, plan: [], rec: [], shop: [], history: [] };
   const data = recordOf(value);
-  if (!data || (!Array.isArray(data.tx) && !Array.isArray(data.shop))) {
+  if (
+    !data ||
+    (!Array.isArray(data.tx) &&
+      !Array.isArray(data.shop) &&
+      !Array.isArray(data.history))
+  ) {
     throw new Error("O backup precisa conter uma lista de transações em tx.");
   }
   return {
@@ -106,6 +118,7 @@ export function normalizeBackup(value: unknown): BackupData {
     plan: Array.isArray(data.plan) ? data.plan : [],
     rec: Array.isArray(data.rec) ? data.rec : [],
     shop: Array.isArray(data.shop) ? data.shop : [],
+    history: Array.isArray(data.history) ? data.history : [],
   };
 }
 
@@ -222,5 +235,37 @@ export function normalizeShoppingItem(
     oldId: stringValue(item.id),
     id: importId("shop", item.id),
     data,
+  };
+}
+
+export function normalizeShoppingHistory(
+  value: unknown,
+): NormalizedShoppingHistory | null {
+  const item = recordOf(value);
+  if (!item || item.id == null) return null;
+  const date = dateValue(item.date);
+  const rawItems = Array.isArray(item.items) ? item.items : [];
+  if (!date || !rawItems.length) return null;
+  const items = rawItems
+    .map((rawItem) => {
+      const historyItem = recordOf(rawItem);
+      const name = stringValue(historyItem?.name);
+      const qty = Math.max(1, Math.trunc(Number(historyItem?.qty) || 1));
+      if (!name) return null;
+      const price = amountValue(historyItem?.price);
+      return { name: name.slice(0, 120), qty, price };
+    })
+    .filter(
+      (historyItem): historyItem is { name: string; qty: number; price: number } =>
+        historyItem !== null,
+    );
+  if (!items.length) return null;
+  return {
+    id: importId("history", item.id),
+    data: {
+      date,
+      total: amountValue(item.total),
+      items,
+    },
   };
 }

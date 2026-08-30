@@ -1,15 +1,13 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { AuthGuard } from "./auth-guard";
 import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
+import { FinancialAssistant } from "./financial-assistant";
 import { useAuth } from "@/hooks/useAuth";
 import { usePierreBalance } from "@/hooks/usePierreBalance";
-import {
-  PIERRE_API_KEY_STORAGE,
-  usePierreAutoSync,
-} from "@/hooks/usePierreAutoSync";
+import { usePierreAutoSync } from "@/hooks/usePierreAutoSync";
 import { useTransactions } from "@/hooks/useTransactions";
 import type { Transaction } from "@/types";
 
@@ -40,26 +38,19 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
-  const [pierreApiKey, setPierreApiKey] = useState<string | null>(null);
   const data = useTransactions(user?.uid, month, year);
   const {
     balance: pierreBalance,
     accountId: pierreAccountId,
     accountName: pierreAccountName,
-    apiKey: pierreProfileApiKey,
+    hasApiKey: pierreHasApiKey,
     loading: pierreProfileLoading,
     error: balanceError,
   } = usePierreBalance(user?.uid);
 
-  useEffect(() => {
-    setPierreApiKey(
-      window.localStorage.getItem(PIERRE_API_KEY_STORAGE),
-    );
-  }, [user?.uid]);
-
   usePierreAutoSync({
     uid: user?.uid,
-    apiKey: pierreProfileApiKey || pierreApiKey,
+    hasApiKey: pierreHasApiKey,
     preferredAccountId: pierreAccountId,
     profileLoading: pierreProfileLoading,
   });
@@ -115,6 +106,7 @@ function Inner({ children }: { children: React.ReactNode }) {
           year={year}
           onClose={() => setModal(false)}
         />
+        <FinancialAssistant />
       </main>
     </DashboardContext.Provider>
   );

@@ -3,7 +3,9 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
 import {
+  createShoppingHistory,
   createShoppingItemsBatch,
+  listShoppingHistory,
   listShoppingItems,
 } from "@/services/shopping";
 import {
@@ -25,6 +27,7 @@ import {
   normalizePlan,
   normalizeRecurrence,
   normalizeShoppingItem,
+  normalizeShoppingHistory,
   normalizeTransaction,
 } from "@/utils/backup";
 
@@ -59,13 +62,14 @@ export default function ConfiguracoesPage() {
     if (!user) return;
     setToast("Preparando backup...");
     try {
-      const [tx, plan, rec, shop] = await Promise.all([
+      const [tx, plan, rec, shop, history] = await Promise.all([
         listTransactions(user.uid),
         listPlans(user.uid),
         listRecurrences(user.uid),
         listShoppingItems(user.uid),
+        listShoppingHistory(user.uid),
       ]);
-      const data = JSON.stringify({ tx, plan, rec, shop }, null, 2);
+      const data = JSON.stringify({ tx, plan, rec, shop, history }, null, 2);
       const blob = new Blob([data], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -103,16 +107,20 @@ export default function ConfiguracoesPage() {
           ...item,
           data: { ...item.data, order: index },
         }));
+      const historyItems = backup.history
+        .map(normalizeShoppingHistory)
+        .filter((item): item is NonNullable<typeof item> => item !== null);
 
-      if (!transactionItems.length && !planItems.length && !recurrenceItems.length && !shoppingItems.length) {
+      if (!transactionItems.length && !planItems.length && !recurrenceItems.length && !shoppingItems.length && !historyItems.length) {
         throw new Error("O backup não contém dados financeiros compatíveis.");
       }
 
-      const [existingTransactions, existingPlans, existingRecurrences, existingShopping] = await Promise.all([
+      const [existingTransactions, existingPlans, existingRecurrences, existingShopping, existingHistory] = await Promise.all([
         listTransactions(user.uid),
         listPlans(user.uid),
         listRecurrences(user.uid),
         listShoppingItems(user.uid),
+        listShoppingHistory(user.uid),
       ]);
       const existingTransactionIds = new Set(existingTransactions.map((item) => item.id));
       const existingPierreIds = new Set(
@@ -121,6 +129,7 @@ export default function ConfiguracoesPage() {
       const existingPlanIds = new Set(existingPlans.map((item) => item.id));
       const existingRecurrenceIds = new Set(existingRecurrences.map((item) => item.id));
       const existingShoppingIds = new Set(existingShopping.map((item) => item.id));
+      const existingHistoryIds = new Set(existingHistory.map((item) => item.id));
 
       const newPlans = planItems.filter((item) => !item.id || !existingPlanIds.has(item.id));
       const newRecurrences = recurrenceItems.filter(
@@ -128,6 +137,9 @@ export default function ConfiguracoesPage() {
       );
       const newShoppingItems = shoppingItems.filter(
         (item) => !item.id || !existingShoppingIds.has(item.id),
+      );
+      const newHistoryItems = historyItems.filter(
+        (item) => !item.id || !existingHistoryIds.has(item.id),
       );
       await Promise.all([
         createPlansBatch(user.uid, newPlans),
@@ -163,14 +175,20 @@ export default function ConfiguracoesPage() {
         user.uid,
         newShoppingItems.map((item) => ({ id: item.id, data: item.data })),
       );
+      await Promise.all(
+        newHistoryItems.map((item) =>
+          createShoppingHistory(user.uid, item.data, item.id),
+        ),
+      );
 
       const ignored =
         transactionItems.length - newTransactions.length +
         planItems.length - newPlans.length +
         recurrenceItems.length - newRecurrences.length +
-        shoppingItems.length - newShoppingCount;
+        shoppingItems.length - newShoppingCount +
+        historyItems.length - newHistoryItems.length;
       setToast(
-        `${newTransactions.length} transações, ${newPlans.length} planos, ${newRecurrences.length} recorrências e ${newShoppingCount} itens de compras importados${
+        `${newTransactions.length} transações, ${newPlans.length} planos, ${newRecurrences.length} recorrências, ${newShoppingCount} itens de compras e ${newHistoryItems.length} históricos importados${
           ignored ? ` (${ignored} já existentes ignorados)` : ""
         }.`,
       );

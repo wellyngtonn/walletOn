@@ -2,11 +2,23 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { Recurrence } from "../src/types";
 import {
+  getDescriptionSuggestions,
   recurrenceDate,
   recurrenceExpired,
   recurrenceScheduled,
   recurrenceStarted,
 } from "../src/utils/planning";
+
+test("sugere descrições a partir de três letras, ignorando acentos e repetição", () => {
+  assert.deepEqual(
+    getDescriptionSuggestions(
+      ["Supermercado", "supermercado", "Saúde", "Salário", "Conta de luz"],
+      "sau",
+    ),
+    ["Saúde"],
+  );
+  assert.deepEqual(getDescriptionSuggestions(["Supermercado"], "su"), []);
+});
 
 function recurrence(
   overrides: Partial<Recurrence> = {},

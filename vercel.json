@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/financial-assistant.ts": {
+      "maxDuration": 60
+    }
+  }
+}

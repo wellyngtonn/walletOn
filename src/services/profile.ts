@@ -15,7 +15,7 @@ export interface PierreProfile {
   accountId: string | null;
   accountName: string | null;
   accounts: PierreAccountProfile[];
-  apiKey: string | null;
+  hasApiKey: boolean;
 }
 
 export function subscribePierreProfile(
@@ -67,12 +67,10 @@ export function subscribePierreProfile(
             ? data.pierreAccountName
             : selectedAccount?.name || null,
         accounts,
-        apiKey:
-          typeof data.pierreApiKey === "string"
-            ? data.pierreApiKey
-            : typeof legacyConfig.pierreKey === "string"
-              ? legacyConfig.pierreKey
-              : null,
+        hasApiKey:
+          data.pierreApiKeyConfigured === true ||
+          (typeof data.pierreApiKey === "string" && data.pierreApiKey.length > 0) ||
+          (typeof legacyConfig.pierreKey === "string" && legacyConfig.pierreKey.length > 0),
       });
     },
     onError,
@@ -109,14 +107,6 @@ export function savePierreAccountSelection(
       pierreBalance: account.balance,
       pierreBalanceUpdatedAt: serverTimestamp(),
     },
-    { merge: true },
-  );
-}
-
-export function savePierreApiKey(uid: string, apiKey: string) {
-  return setDoc(
-    profilePath(uid),
-    { pierreApiKey: apiKey },
     { merge: true },
   );
 }

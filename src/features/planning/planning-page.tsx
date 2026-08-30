@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAllTransactions } from "@/hooks/useAllTransactions";
 import { useDashboard } from "@/components/app-shell";
 import { usePlanning } from "@/hooks/usePlanning";
 import {
@@ -23,6 +24,7 @@ import type {
 } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import {
+  getDescriptionSuggestions,
   recurrenceDate,
   recurrenceExpired,
   recurrenceScheduled,
@@ -81,6 +83,7 @@ export function PlanningPage() {
     error: transactionsError,
   } = useDashboard();
   const { plans, recurrences, loading, error } = usePlanning();
+  const { transactions: historicalTransactions } = useAllTransactions();
   const [modal, setModal] = useState<"plan" | "recurrence" | null>(null);
   const [editingPlan, setEditingPlan] = useState<PlannedTransaction | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState<Recurrence | null>(null);
@@ -88,7 +91,22 @@ export function PlanningPage() {
   const [recurrenceForm, setRecurrenceForm] = useState<RecurrenceInput>(emptyRecurrence(todayString()));
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState("");
+  const [descriptionFocused, setDescriptionFocused] = useState(false);
   const processing = useRef(false);
+
+  const description = modal === "plan" ? planForm.description : recurrenceForm.description;
+  const descriptionSuggestions = useMemo(
+    () =>
+      getDescriptionSuggestions(
+        [
+          ...historicalTransactions.map((transaction) => transaction.description),
+          ...plans.map((plan) => plan.description),
+          ...recurrences.map((recurrence) => recurrence.description),
+        ],
+        description,
+      ),
+    [description, historicalTransactions, plans, recurrences],
+  );
 
   const monthPlans = useMemo(
     () =>
@@ -162,6 +180,7 @@ export function PlanningPage() {
 
   function openPlan(plan?: PlannedTransaction) {
     setActionError("");
+    setDescriptionFocused(false);
     setEditingPlan(plan || null);
     setPlanForm(
       plan
@@ -180,6 +199,7 @@ export function PlanningPage() {
 
   function openRecurrence(recurrence?: Recurrence) {
     setActionError("");
+    setDescriptionFocused(false);
     setEditingRecurrence(recurrence || null);
     if (!recurrence) {
       setRecurrenceForm(emptyRecurrence(todayString()));
@@ -198,6 +218,11 @@ export function PlanningPage() {
       setRecurrenceForm(form);
     }
     setModal("recurrence");
+  }
+
+  function updateDescription(value: string) {
+    if (modal === "plan") setPlanForm({ ...planForm, description: value });
+    else setRecurrenceForm({ ...recurrenceForm, description: value });
   }
 
   async function savePlan() {
@@ -247,14 +272,18 @@ export function PlanningPage() {
 
   async function togglePlan(plan: PlannedTransaction) {
     if (!user) return;
-    await updatePlan(user.uid, plan.id, {
-      type: plan.type,
-      description: plan.description,
-      amount: plan.amount,
-      date: plan.date,
-      category: plan.category,
-      paid: !plan.paid,
-    });
+    try {
+      await updatePlan(user.uid, plan.id, {
+        type: plan.type,
+        description: plan.description,
+        amount: plan.amount,
+        date: plan.date,
+        category: plan.category,
+        paid: !plan.paid,
+      });
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar o lançamento.");
+    }
   }
 
   async function toggleRecurrence(recurrence: Recurrence) {
@@ -270,17 +299,29 @@ export function PlanningPage() {
       paid: !recurrence.paid,
     };
     if (recurrence.limit) data.limit = recurrence.limit;
-    await updateRecurrence(user.uid, recurrence.id, data);
+    try {
+      await updateRecurrence(user.uid, recurrence.id, data);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar a recorrência.");
+    }
   }
 
   async function removePlan(plan: PlannedTransaction) {
     if (!user || !confirm("Excluir este lançamento planejado?")) return;
-    await deletePlan(user.uid, plan.id);
+    try {
+      await deletePlan(user.uid, plan.id);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir o lançamento.");
+    }
   }
 
   async function removeRecurrence(recurrence: Recurrence) {
     if (!user || !confirm("Excluir esta recorrência?")) return;
-    await deleteRecurrence(user.uid, recurrence.id);
+    try {
+      await deleteRecurrence(user.uid, recurrence.id);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir a recorrência.");
+    }
   }
 
   if (loading) return <p className="text-[var(--text3)]">Carregando planejamento...</p>;
@@ -368,7 +409,30 @@ export function PlanningPage() {
               ))}
             </div>
             <div className="modal-body">
+              <div className="description-autocomplete" onFocusCapture={() => setDescriptionFocused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDescriptionFocused(false); }}>
               <input className="field" value={modal === "plan" ? planForm.description : recurrenceForm.description} onChange={(event) => modal === "plan" ? setPlanForm({ ...planForm, description: event.target.value }) : setRecurrenceForm({ ...recurrenceForm, description: event.target.value })} placeholder="Descrição" />
+                {descriptionFocused && descriptionSuggestions.length > 0 && (
+                  <div className="description-suggestions" role="listbox">
+                    <span className="description-suggestions-label">Usados anteriormente</span>
+                    {descriptionSuggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        className="description-suggestion"
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          updateDescription(suggestion);
+                          setDescriptionFocused(false);
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input className="field" type="number" min="0.01" step="0.01" value={(modal === "plan" ? planForm.amount : recurrenceForm.amount) || ""} onChange={(event) => modal === "plan" ? setPlanForm({ ...planForm, amount: Number(event.target.value) }) : setRecurrenceForm({ ...recurrenceForm, amount: Number(event.target.value) })} placeholder="Valor (R$)" />
               {modal === "plan" ? (
                 <input className="field" type="date" value={planForm.date} onChange={(event) => setPlanForm({ ...planForm, date: event.target.value })} />

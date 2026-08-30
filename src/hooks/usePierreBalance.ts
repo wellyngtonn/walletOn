@@ -13,13 +13,13 @@ export function usePierreBalance(uid: string | undefined) {
     accountId: null,
     accountName: null,
     accounts: [],
-    apiKey: null,
+    hasApiKey: false,
   });
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!uid) {
-      setProfile({ balance: null, accountId: null, accountName: null, accounts: [], apiKey: null });
+      setProfile({ balance: null, accountId: null, accountName: null, accounts: [], hasApiKey: false });
       setLoading(false);
       return;
     }

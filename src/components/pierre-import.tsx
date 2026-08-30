@@ -4,27 +4,16 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
   markPierreSyncComplete,
-  PIERRE_API_KEY_STORAGE,
 } from "@/hooks/usePierreAutoSync";
 import { usePierreBalance } from "@/hooks/usePierreBalance";
 import {
-  createTransaction,
-  listTransactions,
-} from "@/services/transactions";
-import {
-  fetchPierreAccounts,
-  fetchPierreTransactions,
-  triggerPierreUpdate,
-  validatePierreKey,
+  savePierreKey,
+  syncPierreRange,
   type PierreAccount,
-  type PierreTransaction,
 } from "@/services/pierre";
 import {
   savePierreAccountSelection,
-  savePierreAccounts,
-  savePierreApiKey,
 } from "@/services/profile";
-import { selectDefaultPierreAccount } from "@/utils/pierre";
 
 const MONTHS = [
   "Janeiro",
@@ -57,7 +46,7 @@ export function PierreImport() {
   const {
     accounts: savedAccounts,
     accountId: savedAccountId,
-    apiKey: savedApiKey,
+    hasApiKey,
   } = usePierreBalance(user?.uid);
   const [key, setKey] = useState("");
   const [accounts, setAccounts] = useState<PierreAccount[]>([]);
@@ -70,73 +59,9 @@ export function PierreImport() {
   const [periodoStatus, setPeriodoStatus] = useState("");
 
   useEffect(() => {
-    setKey(
-      savedApiKey || window.localStorage.getItem(PIERRE_API_KEY_STORAGE) || "",
-    );
-  }, [savedApiKey]);
-
-  useEffect(() => {
     setAccounts(savedAccounts);
     setSelectedAccountId(savedAccountId || savedAccounts[0]?.id || "");
   }, [savedAccounts, savedAccountId]);
-
-  async function importItems(
-    items: PierreTransaction[],
-    existing: Set<string>,
-  ): Promise<number> {
-    if (!user) return 0;
-
-    let imported = 0;
-    for (const item of items) {
-      if (!item.id || existing.has(item.id)) continue;
-
-      const date = new Date(`${item.date}T12:00:00`);
-      if (Number.isNaN(date.getTime())) continue;
-
-      try {
-        await createTransaction(user.uid, {
-          type: item.type === "receita" ? "income" : "expense",
-          description: item.description,
-          amount: item.amount,
-          date: item.date,
-          referenceMonth: date.getMonth() + 1,
-          referenceYear: date.getFullYear(),
-          pierreId: item.id,
-          category: item.category,
-          accountId: item.accountId,
-        });
-        existing.add(item.id);
-        imported++;
-      } catch {
-        // Uma falha isolada não deve interromper a importação das demais.
-      }
-    }
-    return imported;
-  }
-
-  async function loadExistingIds(): Promise<Set<string>> {
-    if (!user) return new Set();
-    const transactions = await listTransactions(user.uid);
-    return new Set(
-      transactions
-        .map((transaction) => transaction.pierreId)
-        .filter((id): id is string => Boolean(id)),
-    );
-  }
-
-  async function syncPierreBalance(apiKey: string) {
-    if (!user) return;
-    const fetchedAccounts = await fetchPierreAccounts(apiKey);
-    const preferredId = selectedAccountId || savedAccountId;
-    const selectedAccount =
-      fetchedAccounts.find((account) => account.id === preferredId) ||
-      selectDefaultPierreAccount(fetchedAccounts);
-    if (!selectedAccount) throw new Error("Nenhuma carteira encontrada no Pierre.");
-
-    setAccounts(fetchedAccounts);
-    setSelectedAccountId(selectedAccount.id);
-    await savePierreAccounts(user.uid, fetchedAccounts, selectedAccount);
-  }
 
   async function changeAccount(accountId: string) {
     const account = accounts.find((item) => item.id === accountId);
@@ -162,20 +87,23 @@ export function PierreImport() {
 
     setBusy(true);
     try {
-      const result = await validatePierreKey(key.trim());
-      if (result.ok) {
-        window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
-        if (user) await savePierreApiKey(user.uid, key.trim());
-        await syncPierreBalance(key.trim());
-      }
-      setToast(result.message);
+      const saved = await savePierreKey(key.trim(), selectedAccountId || savedAccountId);
+      setAccounts(saved.accounts);
+      setSelectedAccountId(
+        saved.accounts.find((account) => account.id === selectedAccountId)?.id ||
+          saved.accounts[0]?.id ||
+          "",
+      );
+      setToast(saved.message);
+    } catch (error) {
+      setToast(errorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
   async function sync12Meses() {
-    if (!user || !key.trim()) {
+    if (!user || (!key.trim() && !hasApiKey)) {
       setToast("Configure a API Key primeiro.");
       return;
     }
@@ -184,23 +112,19 @@ export function PierreImport() {
     setToast("Buscando dados do Pierre...");
 
     try {
-      const validation = await validatePierreKey(key.trim());
-      if (!validation.ok) throw new Error(validation.message);
-      window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
-      await savePierreApiKey(user.uid, key.trim());
-
-      await triggerPierreUpdate(key.trim());
-      await syncPierreBalance(key.trim());
-
       const today = new Date();
       const ago = new Date();
       ago.setFullYear(today.getFullYear() - 1);
-      const items = await fetchPierreTransactions(
-        key.trim(),
+      if (key.trim()) {
+        const saved = await savePierreKey(key.trim(), selectedAccountId || savedAccountId);
+        setAccounts(saved.accounts);
+      }
+      const importedResult = await syncPierreRange(
         ago.toISOString().slice(0, 10),
         today.toISOString().slice(0, 10),
+        selectedAccountId || savedAccountId,
       );
-      const imported = await importItems(items, await loadExistingIds());
+      const imported = importedResult.imported;
       markPierreSyncComplete();
 
       setToast(
@@ -223,7 +147,7 @@ export function PierreImport() {
   }
 
   async function importPeriodo() {
-    if (!user || !key.trim()) {
+    if (!user || (!key.trim() && !hasApiKey)) {
       setToast("Configure a API Key primeiro.");
       return;
     }
@@ -244,23 +168,14 @@ export function PierreImport() {
           a.year * 12 + a.month - (b.year * 12 + b.month),
       );
 
-    let existing: Set<string>;
-    try {
-      existing = await loadExistingIds();
-    } catch (error) {
-      setToast(errorMessage(error));
-      setBusy(false);
-      return;
-    }
     let total = 0;
     let errors = 0;
 
     try {
-      const validation = await validatePierreKey(key.trim());
-      if (!validation.ok) throw new Error(validation.message);
-      window.localStorage.setItem(PIERRE_API_KEY_STORAGE, key.trim());
-      await savePierreApiKey(user.uid, key.trim());
-      await syncPierreBalance(key.trim());
+      if (key.trim()) {
+        const result = await savePierreKey(key.trim(), selectedAccountId || savedAccountId);
+        setAccounts(result.accounts);
+      }
     } catch (error) {
       setToast(errorMessage(error));
       setBusy(false);
@@ -270,13 +185,11 @@ export function PierreImport() {
     for (const { year, month } of meses) {
       setPeriodoStatus(`Buscando ${MONTHS[month]} ${year}...`);
       try {
-        await triggerPierreUpdate(key.trim());
         const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
         const end = `${year}-${String(month + 1).padStart(2, "0")}-${new Date(year, month + 1, 0).getDate()}`;
-        const items = await fetchPierreTransactions(key.trim(), start, end);
-        const imported = await importItems(items, existing);
-        total += imported;
-        setPeriodoStatus(`${MONTHS[month]} ${year}: ${imported} importadas`);
+        const result = await syncPierreRange(start, end, selectedAccountId || savedAccountId);
+        total += result.imported;
+        setPeriodoStatus(`${MONTHS[month]} ${year}: ${result.imported} importadas`);
       } catch (error) {
         errors++;
         setPeriodoStatus(`${MONTHS[month]} ${year}: ${errorMessage(error)}`);
@@ -314,7 +227,7 @@ export function PierreImport() {
             className="settings-input"
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            placeholder="sk-... (API Key)"
+            placeholder={hasApiKey ? "Chave configurada; cole outra para substituir" : "sk-... (API Key)"}
           />
           <button className="btn-primary" onClick={testKey} disabled={busy}>
             {busy ? "Testando..." : "Salvar Chave"}

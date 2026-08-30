@@ -154,6 +154,78 @@ export async function deleteShoppingItemsBatch(uid: string, ids: string[]) {
   });
 }
 
+export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
+  if (!items.length) return 0;
+
+  await runTransaction(db, async (transaction) => {
+    const userReference = userPath(uid);
+    const userSnapshot = await transaction.get(userReference);
+    const currentItems = storedItems(userSnapshot.data()?.shopping);
+    const itemIds = new Set(items.map((item) => item.id));
+    const itemsToArchive = currentItems.filter(
+      (item) => itemIds.has(item.id) && item.done,
+    );
+    if (!itemsToArchive.length) return;
+
+    const groups = new Map<string, ShoppingItem[]>();
+    itemsToArchive.forEach((item) => {
+      const date = item.completedDate || new Date().toISOString().slice(0, 10);
+      groups.set(date, [...(groups.get(date) || []), item]);
+    });
+
+    const historyReferences = [...groups.keys()].map((date) =>
+      doc(historyPath(uid), `shopping-history-${date}`),
+    );
+    const existingHistory = await Promise.all(
+      historyReferences.map((reference) => transaction.get(reference)),
+    );
+
+    [...groups.entries()].forEach(([date, groupedItems], index) => {
+      const reference = historyReferences[index];
+      const snapshot = existingHistory[index];
+      const existing = snapshot.exists()
+        ? storedHistory(snapshot.id, snapshot.data())
+        : null;
+      const historyItems = [
+        ...(existing?.items || []),
+        ...groupedItems.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+        })),
+      ];
+      const total =
+        (existing?.total || 0) +
+        groupedItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+      const historyData = {
+        id: reference.id,
+        userId: uid,
+        date,
+        total,
+        items: historyItems,
+      } as Record<string, unknown>;
+      const createdAt = existing ? snapshot.data()?.createdAt : null;
+      historyData.createdAt = createdAt || serverTimestamp();
+      transaction.set(
+        reference,
+        historyData,
+        { merge: true },
+      );
+    });
+
+    transaction.set(
+      userReference,
+      {
+        shopping: currentItems.filter((item) => !itemIds.has(item.id)),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+
+  return items.length;
+}
+
 export function subscribeShoppingHistory(
   uid: string,
   onData: (items: ShoppingHistory[]) => void,

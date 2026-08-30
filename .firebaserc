@@ -3,6 +3,14 @@
     "default": "wallet-on-c0b05",
     "walletOn": "wallet-on-c0b05"
   },
-  "targets": {},
+  "targets": {
+    "wallet-on-c0b05": {
+      "hosting": {
+        "setenta": [
+          "setenta"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

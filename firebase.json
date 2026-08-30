@@ -6,8 +6,11 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "hosting": {
-    "site": "wallet-on-c0b05",
+  "functions": {
+    "source": "functions"
+  },
+  "hosting": [{
+    "target": "setenta",
     "public": "out",
     "predeploy": ["npm run build"],
     "cleanUrls": true,
@@ -17,5 +20,5 @@
       "**/.*",
       "**/node_modules/**"
     ]
-  }
+  }]
 }

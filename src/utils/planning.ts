@@ -1,5 +1,43 @@
 import type { Recurrence } from "../types";
 
+function normalizeDescription(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("pt-BR");
+}
+
+export function getDescriptionSuggestions(
+  descriptions: string[],
+  input: string,
+  limit = 6,
+) {
+  const query = normalizeDescription(input.trim());
+  if (query.length < 3) return [];
+
+  const matches = new Map<string, { description: string; count: number }>();
+  descriptions.forEach((value) => {
+    const description = value.trim();
+    if (!description) return;
+    const key = normalizeDescription(description);
+    if (!key.startsWith(query)) return;
+    const current = matches.get(key);
+    matches.set(key, {
+      description: current?.description || description,
+      count: (current?.count || 0) + 1,
+    });
+  });
+
+  return [...matches.values()]
+    .sort(
+      (a, b) =>
+        b.count - a.count ||
+        a.description.localeCompare(b.description, "pt-BR"),
+    )
+    .slice(0, limit)
+    .map(({ description }) => description);
+}
+
 export function periodIndex(year: number, month: number) {
   return year * 12 + month - 1;
 }

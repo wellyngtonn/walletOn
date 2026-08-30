@@ -4,13 +4,14 @@ import {
   normalizeBackup,
   normalizePlan,
   normalizeRecurrence,
+  normalizeShoppingHistory,
   normalizeShoppingItem,
   normalizeTransaction,
 } from "../src/utils/backup";
 
 test("normaliza backup completo e mantém as três coleções", () => {
   const backup = normalizeBackup({ tx: [1], plan: [2], rec: [3] });
-  assert.deepEqual(backup, { tx: [1], plan: [2], rec: [3], shop: [] });
+  assert.deepEqual(backup, { tx: [1], plan: [2], rec: [3], shop: [], history: [] });
 });
 
 test("normaliza item da lista de compras com preço e conclusão", () => {
@@ -63,4 +64,17 @@ test("descarta dados financeiros inválidos", () => {
   assert.equal(normalizePlan({ amount: 10, date: "invalida" }), null);
   assert.equal(normalizeRecurrence({ amount: 10, startDate: "2026-01-01" }), null);
   assert.throws(() => normalizeBackup({ plan: [] }), /tx/);
+});
+
+test("normaliza historico de compras", () => {
+  const history = normalizeShoppingHistory({
+    id: "h1",
+    date: "08/08/2026",
+    total: "R$ 25,50",
+    items: [{ name: "Arroz", qty: 2, price: "R$ 12,75" }],
+  });
+  assert.equal(history?.id, "carteira-history-h1");
+  assert.equal(history?.data.date, "2026-08-08");
+  assert.equal(history?.data.total, 25.5);
+  assert.deepEqual(history?.data.items[0], { name: "Arroz", qty: 2, price: 12.75 });
 });
