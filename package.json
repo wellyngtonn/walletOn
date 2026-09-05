@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "tsc -p tsconfig.tests.json && node --test .test-dist/tests/*.test.js",
     "firebase:deploy": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firebase.ps1",
-    "firebase:deploy:indexes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firestore-indexes.ps1"
+    "firebase:deploy:indexes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firestore-indexes.ps1",
+    "deploy:all": "npm run firebase:deploy && npx vercel --prod --yes"
   },
   "dependencies": {
     "@zxing/browser": "^0.2.1",

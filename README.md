@@ -74,13 +74,26 @@ npm run build
 npm start
 ```
 
-Para publicar o ambiente completo no Firebase:
+Para publicar o ambiente completo:
 
 ```bash
-npm run firebase:deploy
+npm run deploy:all
 ```
 
-Esse comando publica o Hosting, as regras e os índices do Firestore e as regras do Storage. Ele usa OAuth e ignora o `FIREBASE_TOKEN` legado. Para publicar apenas os índices, use `npm run firebase:deploy:indexes`.
+Esse comando publica tudo, em todos os destinos: o frontend e as regras no
+Firebase (Hosting `setenta.web.app`, Firestore e Storage) e depois o frontend e
+as Functions na Vercel (`wallet-on.vercel.app`). Publique sempre nos dois, pois
+as Functions ficam na Vercel e o app também roda no Firebase Hosting.
+
+Para publicar apenas um destino:
+
+```bash
+npm run firebase:deploy          # Firebase Hosting, regras e índices
+npx vercel --prod --yes          # Vercel (frontend e Functions)
+```
+
+O `firebase:deploy` usa OAuth e ignora o `FIREBASE_TOKEN` legado. Para publicar
+apenas os índices, use `npm run firebase:deploy:indexes`.
 
 Para uma PWA totalmente offline, evolua o service worker conforme as estratégias de cache e atualização exigidas pelo ambiente de produção. A versão atual instala o app e oferece fallback para os recursos básicos já visitados.
 # Consulta de produtos por código de barras
