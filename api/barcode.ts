@@ -4,11 +4,25 @@ import { cosmosProductName, upcProductName, validBarcode } from "../src/utils/sh
 type Request = IncomingMessage & { body?: { barcode?: unknown } };
 type Response = ServerResponse & { status: (code: number) => Response; json: (body: unknown) => void };
 const cache = new Map<string, { name: string; source: string; expires: number }>();
+const defaultOrigins = [
+  "https://setenta.web.app",
+  "https://setenta.firebaseapp.com",
+  "https://wallet-on-c0b05.web.app",
+  "https://wallet-on-c0b05.firebaseapp.com",
+  "https://wallet-on.vercel.app",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+  "http://172.22.192.1:3001",
+];
 
 export default async function handler(req: Request, res: Response) {
   const origin = req.headers.origin;
-  const allowed = (process.env.ALLOWED_ORIGIN || "https://setenta.web.app,https://setenta.firebaseapp.com").split(",").map((value) => value.trim());
-  if (origin && allowed.includes(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
+  const allowed = new Set(
+    (process.env.ALLOWED_ORIGIN || defaultOrigins.join(",")).split(",").map((value) => value.trim()).filter(Boolean),
+  );
+  if (origin && allowed.has(origin)) res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
