@@ -26,7 +26,8 @@ export async function lookupBarcode(code: string, signal: AbortSignal) {
     });
     const data = await response.json().catch(() => null);
     if (response.ok && typeof data?.name === "string" && data.name.trim()) return remember(data.name, "");
-    if (response.status !== 404 || !data?.error) notice = data?.error || "Consulta brasileira indisponível.";
+    if (response.status === 404) return remember("", "");
+    notice = data?.error || "Consulta de produtos indisponível.";
   } catch (error) {
     if (signal.aborted) throw error;
     notice = "Consulta de produtos indisponível.";

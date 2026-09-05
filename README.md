@@ -85,8 +85,11 @@ Esse comando publica o Hosting, as regras e os índices do Firestore e as regras
 Para uma PWA totalmente offline, evolua o service worker conforme as estratégias de cache e atualização exigidas pelo ambiente de produção. A versão atual instala o app e oferece fallback para os recursos básicos já visitados.
 # Consulta de produtos por código de barras
 
-A busca consulta o catálogo pessoal salvo no Firebase, depois UPCitemdb (plano
-gratuito, sem chave), Bluesoft Cosmos (se configurado) e Open Food Facts.
+A busca consulta o catálogo pessoal salvo no Firebase e depois a Function
+publicada em `api/barcode.ts`, que tenta Open Food Facts (gratuito e sem chave),
+Bluesoft Cosmos (somente se configurado) e UPCitemdb (gratuito e sem chave) por
+último, para não gastar a cota diária. Se a Function estiver indisponível, o app
+ainda consulta o Open Food Facts direto do navegador.
 Os últimos 300 produtos encontrados são salvos no campo `barcodeCatalog` do
 documento do usuário, com acesso restrito ao próprio dono pelas regras existentes.
 Consultas repetidas usam esse catálogo, inclusive após recarregar a página.
