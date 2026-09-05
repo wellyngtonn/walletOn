@@ -13,6 +13,8 @@
     "firebase:deploy:indexes": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-firestore-indexes.ps1"
   },
   "dependencies": {
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
     "firebase": "^12.1.0",
     "firebase-admin": "^14.3.0",
     "jspdf": "^4.2.1",

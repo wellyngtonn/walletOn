@@ -232,15 +232,6 @@ export function ShoppingPage() {
     if (!scannerOpen) return;
 
     let cancelled = false;
-    const detectorConstructor = (
-      window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }
-    ).BarcodeDetector;
-
-    if (!detectorConstructor) {
-      setScannerError("A leitura por câmera não é suportada neste navegador. Use o campo ou um leitor físico.");
-      return () => undefined;
-    }
-    const Detector = detectorConstructor;
 
     async function startScanner() {
       try {
@@ -261,25 +252,66 @@ export function ShoppingPage() {
         if (!video) throw new Error("camera-view");
         video.srcObject = stream;
         await video.play();
-        const detector = new Detector({ formats: BARCODE_FORMATS });
+
+        const normalize = (rawValue: string) => {
+          const digits = rawValue.replace(/\D/g, "");
+          return digits.length >= 8 && digits.length <= 14 ? digits : "";
+        };
+        const ctor = (window as Window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector;
+        let engine: () => Promise<string>;
+
+        if (ctor) {
+          const detector = new ctor({ formats: BARCODE_FORMATS });
+          engine = async () => {
+            const detections = await detector.detect(video);
+            for (const detection of detections) {
+              const code = normalize(detection.rawValue || "");
+              if (code) return code;
+            }
+            return "";
+          };
+        } else {
+          const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+            import("@zxing/browser"),
+            import("@zxing/library"),
+          ]);
+          const reader = new BrowserMultiFormatReader(new Map([
+            [DecodeHintType.POSSIBLE_FORMATS, [
+              BarcodeFormat.EAN_13, BarcodeFormat.EAN_8,
+              BarcodeFormat.UPC_A, BarcodeFormat.UPC_E,
+            ]],
+          ]));
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d", { willReadFrequently: true });
+          engine = async () => {
+            if (!context || video.videoWidth < 1) return "";
+            if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+            }
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+            try {
+              const result = reader.decodeFromCanvas(canvas);
+              return normalize(result?.getText?.() || "");
+            } catch {
+              return "";
+            }
+          };
+        }
 
         const scan = async () => {
           if (cancelled || !videoRef.current) return;
           try {
-            const detections = await detector.detect(videoRef.current);
-            const code = detections
-              .map((detection) => detection.rawValue || "")
-              .map((value) => value.replace(/\D/g, ""))
-              .find((value) => value.length >= 8 && value.length <= 14);
+            const code = await engine();
             if (code) {
               setBarcode(code);
               closeScanner();
               return;
             }
           } catch {
-            // A frame can fail while the camera is adjusting focus; continue scanning.
+            // A frame pode falhar enquanto a câmera ajusta o foco; continue.
           }
-          if (!cancelled) scannerTimerRef.current = window.setTimeout(() => void scan(), 80);
+          if (!cancelled) scannerTimerRef.current = window.setTimeout(() => void scan(), 120);
         };
 
         void scan();
@@ -288,7 +320,9 @@ export function ShoppingPage() {
           setScannerError(
             exception instanceof DOMException && exception.name === "NotAllowedError"
               ? "Permita o acesso à câmera para ler o código."
-              : "Não foi possível iniciar a câmera. Confira as permissões do navegador.",
+              : exception instanceof DOMException && exception.name === "NotFoundError"
+                ? "Nenhuma câmera encontrada neste aparelho."
+                : "Não foi possível iniciar a câmera. Confira as permissões do navegador.",
           );
         }
       }
