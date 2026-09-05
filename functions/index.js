@@ -280,6 +280,17 @@ function selectedAccount(accounts, preferredAccountId) {
     );
 }
 
+function pierreHttpsError(error, fallbackMessage) {
+  const status = Number(error?.status);
+  if (status === 401) return new HttpsError("failed-precondition", "API Key Pierre inválida.");
+  if (status === 403) return new HttpsError("permission-denied", "A API do Pierre negou o acesso.");
+  if (status === 404) return new HttpsError("not-found", "Endpoint do Pierre não encontrado.");
+  if (status === 408 || status === 429 || status >= 500) {
+    return new HttpsError("unavailable", "O Pierre está indisponível no momento. Tente novamente em instantes.");
+  }
+  return new HttpsError("internal", fallbackMessage);
+}
+
 async function savePierreProfile(uid, key, accounts, preferredAccountId) {
   const selected = selectedAccount(accounts, preferredAccountId);
   if (!selected) throw new HttpsError("failed-precondition", "Nenhuma carteira encontrada no Pierre.");
@@ -343,8 +354,9 @@ exports.savePierreApiKey = onCall(
       await savePierreProfile(uid, key, accounts, preferredAccountId);
       return { ok: true, message: validation.message, accounts };
     } catch (error) {
+      if (error instanceof HttpsError) throw error;
       logger.error("Falha ao salvar a chave Pierre", { uid, error: String(error) });
-      throw new HttpsError("internal", "Não foi possível salvar a conexão Pierre.");
+      throw pierreHttpsError(error, "Não foi possível salvar a conexão Pierre.");
     }
   },
 );
@@ -380,7 +392,7 @@ exports.syncPierreData = onCall(
         : null;
       await savePierreProfile(uid, key, accounts, preferredAccountId);
 
-      const items = await fetchTransactions(key, from, to);
+      const items = await fetchTransactions(key, from, to, accounts);
       const existingSnapshot = await profileReference(uid).collection("transactions").get();
       const existingIds = new Set(
         existingSnapshot.docs
@@ -413,8 +425,12 @@ exports.syncPierreData = onCall(
       return { imported: newItems.length };
     } catch (error) {
       if (error instanceof HttpsError) throw error;
-      logger.error("Falha na sincronização Pierre", { uid, error: String(error) });
-      throw new HttpsError("internal", "Não foi possível sincronizar o Pierre agora.");
+      logger.error("Falha na sincronização Pierre", {
+        uid,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw pierreHttpsError(error, "Não foi possível sincronizar o Pierre agora.");
     }
   },
 );

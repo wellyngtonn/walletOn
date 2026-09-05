@@ -1575,6 +1575,33 @@ select {
   gap: 10px;
   margin-bottom: 8px;
 }
+.shop-history-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  margin-bottom: 12px;
+  color: var(--text);
+  text-align: left;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.shop-history-title span {
+  overflow-wrap: anywhere;
+}
+.shop-history-title svg {
+  flex-shrink: 0;
+}
+.shop-history-title-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.shop-history-title-editor .shop-input {
+  flex: 1 1 180px;
+  min-width: 0;
+}
 .shop-historico-summary {
   display: flex;
   align-items: center;

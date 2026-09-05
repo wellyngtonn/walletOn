@@ -87,6 +87,7 @@ export interface ShoppingHistoryItem {
 export interface ShoppingHistory {
   id: string;
   userId: string;
+  title?: string;
   date: string;
   total: number;
   items: ShoppingHistoryItem[];

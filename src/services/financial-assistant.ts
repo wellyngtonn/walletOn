@@ -1,5 +1,6 @@
 import { auth } from "@/lib/firebase/config";
 import type { Transaction } from "@/types";
+import type { PlannedTransaction, Recurrence } from "@/types";
 
 export type AssistantMessage = {
   role: "user" | "model";
@@ -17,6 +18,8 @@ export async function askFinancialAssistant(
   message: string,
   history: AssistantMessage[] = [],
   transactions: Transaction[] = [],
+  plans: PlannedTransaction[] = [],
+  recurrences: Recurrence[] = [],
 ) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Faça login para usar o assistente financeiro.");
@@ -31,13 +34,36 @@ export async function askFinancialAssistant(
     body: JSON.stringify({
       message: message.trim().slice(0, 2000),
       history: history.slice(-8),
-      transactions: transactions.slice(0, 10000).map((transaction) => ({
-        userId: transaction.userId,
-        type: transaction.type,
-        description: transaction.description,
-        category: transaction.category || "Outros",
-        amount: transaction.amount,
-        date: transaction.date,
+      transactions: transactions
+        .filter((transaction) => typeof transaction.pierreId === "string" && transaction.pierreId.trim().length > 0)
+        .slice(0, 10000)
+        .map((transaction) => ({
+          userId: transaction.userId,
+          type: transaction.type,
+          description: transaction.description,
+          category: transaction.category || "Outros",
+          amount: transaction.amount,
+          date: transaction.date,
+        })),
+      plans: plans.slice(0, 5000).map((plan) => ({
+        userId: plan.userId,
+        type: plan.type,
+        description: plan.description,
+        category: plan.category,
+        amount: plan.amount,
+        date: plan.date,
+        paid: plan.paid === true,
+      })),
+      recurrences: recurrences.slice(0, 5000).map((recurrence) => ({
+        userId: recurrence.userId,
+        type: recurrence.type,
+        description: recurrence.description,
+        category: recurrence.category,
+        amount: recurrence.amount,
+        startDate: recurrence.startDate,
+        period: recurrence.period,
+        limit: recurrence.limit,
+        paid: recurrence.paid === true,
       })),
     }),
   });

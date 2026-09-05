@@ -26,7 +26,7 @@ export function TypePage({ type }: { type: TransactionType }) {
 
   return (
     <>
-      <div className="mb-5 flex items-start justify-between md:block">
+      <div className="mb-5 flex items-center justify-between gap-3">
         <div>
           <h2 className="sec-title">{title}</h2>
           <div className="mt-2 md:hidden">
@@ -34,10 +34,12 @@ export function TypePage({ type }: { type: TransactionType }) {
           </div>
         </div>
         <button
+          type="button"
           onClick={openCreate}
-          className="btn-primary mt-2 rounded-full px-5 py-3 text-lg font-bold md:hidden"
+          className="btn-primary mt-2 rounded-full px-5 py-3 text-lg font-bold md:mt-0 md:rounded-[10px] md:px-4 md:py-[9px] md:text-sm"
         >
-          +
+          <span className="md:hidden">+</span>
+          <span className="hidden md:inline">+ Lançamento</span>
         </button>
       </div>
       {error && <div className="msg-error mb-4">{error}</div>}

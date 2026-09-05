@@ -1,5 +1,4 @@
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { firebaseApp } from "@/lib/firebase/config";
+import { auth } from "@/lib/firebase/config";
 
 export interface PierreAccount {
   id: string;
@@ -20,35 +19,53 @@ export interface PierreTransaction {
 type ValidationResponse = { ok: boolean; message: string };
 type SaveKeyResponse = ValidationResponse & { accounts: PierreAccount[] };
 type SyncResponse = { imported: number };
+type BalanceResponse = { accounts: PierreAccount[]; balance: number | null };
 
-const functions = getFunctions(firebaseApp, "southamerica-east1");
-const validateKeyCall = httpsCallable<{ key: string }, ValidationResponse>(
-  functions,
-  "validatePierreKey",
-);
-const saveKeyCall = httpsCallable<
-  { key: string; preferredAccountId?: string | null },
-  SaveKeyResponse
->(functions, "savePierreApiKey");
-const syncCall = httpsCallable<
-  { fromDate?: string; toDate?: string; preferredAccountId?: string | null },
-  SyncResponse
->(functions, "syncPierreData");
+const pierreApiUrl = process.env.NEXT_PUBLIC_PIERRE_API_URL || "/api/pierre";
+
+type PierreRequest = {
+  action: "validate" | "save" | "sync" | "balance";
+  key?: string;
+  fromDate?: string;
+  toDate?: string;
+  preferredAccountId?: string | null;
+};
+
+async function callPierre<T>(body: PierreRequest): Promise<T> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Faça login para sincronizar o Pierre.");
+  const token = await currentUser.getIdToken();
+  const response = await fetch(pierreApiUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => null) as (T & { error?: string }) | null;
+  if (!response.ok) {
+    const error = new Error(data?.error || `Erro HTTP ${response.status}.`);
+    (error as Error & { code?: string }).code = String(response.status);
+    throw error;
+  }
+  if (!data) throw new Error("Resposta inválida da API do Pierre.");
+  return data;
+}
 
 export async function validatePierreKey(key: string) {
-  const result = await validateKeyCall({ key: key.trim() });
-  return result.data;
+  return callPierre<ValidationResponse>({ action: "validate", key: key.trim() });
 }
 
 export async function savePierreKey(
   key: string,
   preferredAccountId?: string | null,
 ) {
-  const result = await saveKeyCall({
+  return callPierre<SaveKeyResponse>({
+    action: "save",
     key: key.trim(),
     preferredAccountId,
   });
-  return result.data;
 }
 
 export async function syncPierreRange(
@@ -56,6 +73,17 @@ export async function syncPierreRange(
   toDate?: string,
   preferredAccountId?: string | null,
 ) {
-  const result = await syncCall({ fromDate, toDate, preferredAccountId });
-  return result.data;
+  return callPierre<SyncResponse>({
+    action: "sync",
+    fromDate,
+    toDate,
+    preferredAccountId,
+  });
+}
+
+export async function refreshPierreBalance(preferredAccountId?: string | null) {
+  return callPierre<BalanceResponse>({
+    action: "balance",
+    preferredAccountId,
+  });
 }

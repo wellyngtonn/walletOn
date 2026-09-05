@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Barcode, Camera, Check, Copy, ScanLine, X } from "lucide-react";
+import { Barcode, Camera, Check, Copy, Pencil, ScanLine, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import {
@@ -10,6 +10,7 @@ import {
   deleteShoppingItem,
   ensureShoppingHistory,
   updateShoppingItem,
+  updateShoppingHistoryTitle,
 } from "@/services/shopping";
 import type {
   ShoppingHistory,
@@ -18,6 +19,8 @@ import type {
 } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { INITIAL_SHOPPING_HISTORY } from "@/features/shopping/historical-data";
+import { validBarcode } from "@/utils/shopping-product";
+import { lookupBarcode } from "@/services/barcode";
 
 type ShopTab = "ativa" | "historico";
 
@@ -57,15 +60,21 @@ export function ShoppingPage() {
   const { items, history: savedHistory, loading, error } = useShoppingList();
   const [tab, setTab] = useState<ShopTab>("ativa");
   const [barcode, setBarcode] = useState("");
+  const [barcodeNotice, setBarcodeNotice] = useState("");
   const [barcodeStatus, setBarcodeStatus] = useState<"loading" | "ok" | "warn" | "err" | "">("");
   const [name, setName] = useState("");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
+  const [addingItem, setAddingItem] = useState(false);
+  const addingItemRef = useRef(false);
   const [actionError, setActionError] = useState("");
   const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState("");
   const [archiving, setArchiving] = useState(false);
+  const [editingTitleDate, setEditingTitleDate] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
+  const [savingTitle, setSavingTitle] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
@@ -165,7 +174,11 @@ export function ShoppingPage() {
 
   const lookupProduct = useCallback(async (rawCode: string) => {
     const code = rawCode.replace(/\D/g, "");
-    if (code.length < 8 || code.length > 14) return;
+    if (!validBarcode(code)) return;
+
+    lookupControllerRef.current?.abort();
+    const requestId = ++lookupRequestRef.current;
+    setBarcodeNotice("");
 
     const cachedName = barcodeCacheRef.current.get(code);
     if (cachedName !== undefined) {
@@ -179,25 +192,15 @@ export function ShoppingPage() {
       return;
     }
 
-    lookupControllerRef.current?.abort();
     const controller = new AbortController();
     lookupControllerRef.current = controller;
-    const requestId = ++lookupRequestRef.current;
     setBarcodeStatus("loading");
 
     try {
-      const response = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}?fields=product_name,product_name_pt,abbreviated_product_name`,
-        { signal: controller.signal },
-      );
-      if (!response.ok) throw new Error("barcode");
-      const data = await response.json();
-      const product = data.product;
-      const productName = String(
-        product?.product_name_pt || product?.product_name || product?.abbreviated_product_name || "",
-      ).trim();
+      const { name: productName, notice } = await lookupBarcode(code, controller.signal);
       if (requestId !== lookupRequestRef.current) return;
-      barcodeCacheRef.current.set(code, productName || null);
+      setBarcodeNotice(notice || (!productName ? "Produto não encontrado. Digite o nome para continuar." : ""));
+      if (productName && !notice) barcodeCacheRef.current.set(code, productName);
       if (!productName) {
         setBarcodeStatus("warn");
         return;
@@ -208,16 +211,20 @@ export function ShoppingPage() {
     } catch {
       if (!controller.signal.aborted && requestId === lookupRequestRef.current) {
         setBarcodeStatus("err");
+        setBarcodeNotice("Não foi possível consultar o produto. Tente novamente ou digite o nome.");
       }
     }
   }, []);
 
   useEffect(() => {
-    if (barcode.length < 8 || barcode.length > 14) {
+    lookupControllerRef.current?.abort();
+    ++lookupRequestRef.current;
+    setBarcodeNotice("");
+    if (!validBarcode(barcode)) {
       setBarcodeStatus("");
       return;
     }
-    const timer = window.setTimeout(() => void lookupProduct(barcode), 120);
+    const timer = window.setTimeout(() => void lookupProduct(barcode), 400);
     return () => window.clearTimeout(timer);
   }, [barcode, lookupProduct]);
 
@@ -295,16 +302,21 @@ export function ShoppingPage() {
   }, [closeScanner, releaseScanner, scannerOpen]);
 
   async function addItem() {
+    if (addingItemRef.current) return;
     if (!user || !name.trim()) {
       setActionError("Digite o nome do item.");
+      nameRef.current?.focus();
       return;
     }
     const parsedPrice = priceValue(price);
     if (parsedPrice === null) {
       setActionError("Informe um preço válido.");
+      priceRef.current?.focus();
       return;
     }
     setActionError("");
+    addingItemRef.current = true;
+    setAddingItem(true);
     const nextOrder = items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
     try {
       await createShoppingItem(user.uid, {
@@ -323,6 +335,9 @@ export function ShoppingPage() {
       nameRef.current?.focus();
     } catch (exception) {
       setActionError(exception instanceof Error ? exception.message : "Não foi possível adicionar o item.");
+    } finally {
+      addingItemRef.current = false;
+      setAddingItem(false);
     }
   }
 
@@ -330,14 +345,17 @@ export function ShoppingPage() {
     event: React.KeyboardEvent<HTMLInputElement>,
     next: React.RefObject<HTMLInputElement | null>,
   ) {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
     event.preventDefault();
+    if (event.repeat || addingItemRef.current) return;
     next.current?.focus();
+    next.current?.select();
   }
 
   function submitWithEnter(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
     event.preventDefault();
+    if (event.repeat) return;
     void addItem();
   }
 
@@ -380,7 +398,28 @@ export function ShoppingPage() {
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
       .map((item) => `${item.qty}x ${item.name}${item.price ? ` — ${currency(item.price)} cada` : ""}`);
 
-    return [`*${record.date ? dateBR(record.date) : "Sem data"}*`, `*${currency(record.total)}*`, ...lines].join("\n");
+    return [...(record.title ? [`*${record.title}*`] : []), `*${record.date ? dateBR(record.date) : "Sem data"}*`, `*${currency(record.total)}*`, ...lines].join("\n");
+  }
+
+  async function saveHistoryTitle(record: ShoppingHistory) {
+    if (!user || savingTitle) return;
+    setSavingTitle(true);
+    setActionError("");
+    try {
+      let id = record.id;
+      if (id.startsWith("pending-")) {
+        await archiveShoppingItems(user.uid, completedItems.filter((item) =>
+          (item.completedDate || todayString()) === record.date,
+        ));
+        id = `shopping-history-${record.date}`;
+      }
+      await updateShoppingHistoryTitle(user.uid, id, editingTitle);
+      setEditingTitleDate(null);
+    } catch (exception) {
+      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar o local da compra.");
+    } finally {
+      setSavingTitle(false);
+    }
   }
 
   async function copyHistory(record: ShoppingHistory) {
@@ -477,10 +516,11 @@ export function ShoppingPage() {
               <input ref={nameRef} className="shop-input" value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => moveToNextInput(event, qtyRef)} placeholder="Item..." enterKeyHint="next" />
               <input ref={qtyRef} className="shop-input shop-input--sm" type="number" min="1" value={qty} onChange={(event) => setQty(event.target.value)} onKeyDown={(event) => moveToNextInput(event, priceRef)} placeholder="Qtd" enterKeyHint="next" />
               <input ref={priceRef} className="shop-input shop-input--sm" inputMode="decimal" value={price} onChange={(event) => setPrice(event.target.value)} onKeyDown={submitWithEnter} placeholder="R$" enterKeyHint="done" />
-              <button className="btn-primary btn-sm" type="submit">Adicionar</button>
+              <button className="btn-primary btn-sm" type="submit" disabled={addingItem}>{addingItem ? "Adicionando..." : "Adicionar"}</button>
             </form>
 
             {actionError && <div className="msg-error mb-3">{actionError}</div>}
+            {barcodeNotice && <p className="mb-3 text-sm text-[var(--text3)]" role="status">{barcodeNotice}</p>}
 
             <div className="shop-summary">
               <div className="shop-summary-item"><span className="shop-summary-label">Total Estimado</span><strong className="shop-summary-value">{currency(total)}</strong></div>
@@ -502,8 +542,21 @@ export function ShoppingPage() {
       ) : (
         <div className="shop-tab-content active">
           <div className="widget widget--full"><div className="shop-historico">
+            {actionError && <div className="msg-error mb-3" role="alert">{actionError}</div>}
             {!history.length ? <p className="tx-empty">Nenhuma lista concluída</p> : history.map((record) => (
               <div className="shop-historico-item" key={record.id}>
+                {editingTitleDate === record.date ? (
+                  <form className="shop-history-title-editor" onSubmit={(event) => { event.preventDefault(); void saveHistoryTitle(record); }}>
+                    <input autoFocus className="shop-input" aria-label="Local da compra" placeholder="Nome do local da compra" maxLength={120} value={editingTitle} disabled={savingTitle} onChange={(event) => setEditingTitle(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape" && !savingTitle) setEditingTitleDate(null); }} />
+                    <button className="btn-primary btn-sm" type="submit" disabled={savingTitle}>{savingTitle ? "Salvando..." : "Salvar"}</button>
+                    <button className="btn-outline btn-sm" type="button" disabled={savingTitle} onClick={() => setEditingTitleDate(null)}>Cancelar</button>
+                  </form>
+                ) : (
+                  <button className="shop-history-title" type="button" disabled={savingTitle} aria-label={`Editar local da compra de ${dateBR(record.date)}`} onClick={() => { setEditingTitleDate(record.date); setEditingTitle(record.title || ""); }}>
+                    <span>{record.title || "Adicionar local da compra"}</span>
+                    <Pencil size={14} aria-hidden="true" />
+                  </button>
+                )}
                 <div className="shop-historico-header">
                   <div className="shop-historico-summary">
                     <span className="shop-historico-date">{record.date ? dateBR(record.date) : "Sem data"}</span>

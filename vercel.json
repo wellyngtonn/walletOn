@@ -2,6 +2,9 @@
   "functions": {
     "api/financial-assistant.ts": {
       "maxDuration": 60
+    },
+    "api/pierre.ts": {
+      "maxDuration": 60
     }
   }
 }

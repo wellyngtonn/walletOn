@@ -81,7 +81,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['completedDate']) || request.resource.data.completedDate == null || request.resource.data.completedDate is string);
     }
     function validShoppingHistory(uid) {
-      return request.resource.data.keys().hasOnly(['id','userId','date','total','items','createdAt'])
+      return request.resource.data.keys().hasOnly(['id','userId','date','title','total','items','createdAt'])
         && request.resource.data.keys().hasAll(['id','userId','date','total','items'])
         && request.resource.data.userId == uid
         && request.resource.data.id is string
@@ -90,6 +90,7 @@ service cloud.firestore {
         && request.resource.data.total is number
         && request.resource.data.total >= 0
         && request.resource.data.items is list
+        && (!request.resource.data.keys().hasAny(['title']) || (request.resource.data.title is string && request.resource.data.title.size() <= 120))
         && (!request.resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt is timestamp);
     }
     match /users/{uid} {

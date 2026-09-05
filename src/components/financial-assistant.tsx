@@ -7,7 +7,11 @@ import {
   askFinancialAssistant,
   type AssistantMessage,
 } from "@/services/financial-assistant";
-import { listTransactions } from "@/services/transactions";
+import {
+  listPlans,
+  listRecurrences,
+  listTransactions,
+} from "@/services/transactions";
 
 const initialMessage: AssistantMessage = {
   role: "model",
@@ -65,6 +69,14 @@ function renderAssistantText(value: string) {
   });
 }
 
+function requestsPlanningData(value: string) {
+  const normalized = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  return /\b(plano|planos|planejamento|planejad[oa]s?|recorrenc(?:ia|ias)|recorrente?s?|contas futuras|compromissos? futuros?)\b/.test(normalized);
+}
+
 export function FinancialAssistant() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -87,8 +99,19 @@ export function FinancialAssistant() {
     try {
       const currentUser = auth.currentUser;
       if (!currentUser) throw new Error("Faça login para usar o assistente financeiro.");
-      const transactions = await listTransactions(currentUser.uid);
-      const response = await askFinancialAssistant(message, history, transactions);
+      const includePlanning = requestsPlanningData(message);
+      const [transactions, plans, recurrences] = await Promise.all([
+        listTransactions(currentUser.uid),
+        includePlanning ? listPlans(currentUser.uid) : Promise.resolve([]),
+        includePlanning ? listRecurrences(currentUser.uid) : Promise.resolve([]),
+      ]);
+      const response = await askFinancialAssistant(
+        message,
+        history,
+        transactions,
+        plans,
+        recurrences,
+      );
       setMessages((current) => [
         ...current,
         { role: "model", text: response.text },

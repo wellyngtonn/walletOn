@@ -31,14 +31,30 @@ const MONTHS = [
 ];
 
 function errorMessage(error: unknown): string {
-  if (!(error instanceof Error)) return "Falha ao sincronizar.";
-  if (error.message.includes("401")) return "API Key inválida.";
-  if (error.message.includes("403")) return "Acesso negado à API.";
-  if (error.message.includes("404")) return "Endpoint não encontrado.";
-  if (error.message.toLowerCase().includes("fetch")) {
+  const callableError = error as { code?: unknown; message?: unknown };
+  const code = String(callableError?.code || "").toLowerCase();
+  const message = String(callableError?.message || (error instanceof Error ? error.message : ""));
+  const detail = `${code} ${message}`.toLowerCase();
+  if (detail.includes("unauthenticated")) return "Faça login para sincronizar.";
+  if (detail.includes("failed-precondition") && detail.includes("api key")) {
+    return "Configure uma API Key válida do Pierre.";
+  }
+  if (detail.includes("permission-denied")) return "Você não tem permissão para sincronizar.";
+  if (detail.includes("not-found")) return "A sincronização do Pierre ainda não foi publicada. Tente novamente mais tarde.";
+  if (detail.includes("401")) return "API Key inválida.";
+  if (detail.includes("403")) return "Acesso negado à API.";
+  if (detail.includes("404")) return "Endpoint não encontrado.";
+  if (detail.includes("429")) return "Limite da API atingido. Tente novamente em instantes.";
+  if (detail.includes("unavailable") || detail.includes("deadline-exceeded") || detail.includes("timeout")) {
+    return "O Pierre está indisponível no momento. Tente novamente em instantes.";
+  }
+  if (detail.includes("internal") && (!message || message.trim().toLowerCase() === "internal")) {
+    return "Não foi possível sincronizar o Pierre agora. Tente novamente em instantes.";
+  }
+  if (detail.includes("fetch")) {
     return "Problema de conexão (CORS?).";
   }
-  return error.message.slice(0, 80) || "Falha ao sincronizar.";
+  return message.slice(0, 120) || "Falha ao sincronizar.";
 }
 
 export function PierreImport() {

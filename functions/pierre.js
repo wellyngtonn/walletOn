@@ -1,5 +1,14 @@
 const PIERRE_BASE = "https://www.pierre.finance/tools/api";
 
+class PierreApiError extends Error {
+  constructor(status, path, message = "") {
+    super(message || `HTTP ${status}`);
+    this.name = "PierreApiError";
+    this.status = status;
+    this.path = path;
+  }
+}
+
 function normalizeText(value) {
   return String(value || "")
     .normalize("NFD")
@@ -73,6 +82,17 @@ async function request(path, key, options = {}) {
   }
 }
 
+async function throwResponseError(response, path) {
+  let message = "";
+  try {
+    const body = await response.json();
+    message = String(body?.message || body?.error || "");
+  } catch {
+    // Alguns erros da API retornam corpo vazio ou não-JSON.
+  }
+  throw new PierreApiError(response.status, path, message);
+}
+
 async function validateKey(key) {
   try {
     const response = await request("/get-accounts", key);
@@ -91,18 +111,25 @@ async function triggerUpdate(key) {
 
 async function fetchAccounts(key) {
   const response = await request("/get-accounts", key);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) await throwResponseError(response, "/get-accounts");
   return listFromResponse(await response.json()).map((account, index) => ({
     id: String(account.id || account.accountId || account._id || ""),
-    name: `Carteira ${index + 1} - ${account.name || account.accountName || "Conta"}`,
-    balance: parseAmount(account.balance ?? account.current_balance ?? account.available_balance ?? account.currentBalance ?? 0),
+    name: `Carteira ${index + 1} - ${account.name || account.accountName || account.accountMarketingName || "Conta"}`,
+    balance: parseAmount(account.balance ?? account.accountBalance ?? account.current_balance ?? account.available_balance ?? account.currentBalance ?? 0),
   })).filter((account) => account.id);
 }
 
-async function fetchTransactions(key, startDate, endDate) {
+async function fetchTransactions(key, startDate, endDate, accounts = []) {
   const params = new URLSearchParams({ startDate, endDate });
-  const response = await request(`/get-transactions?${params}`, key);
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const path = `/get-transactions?${params}`;
+  const response = await request(path, key);
+  if (!response.ok) await throwResponseError(response, "/get-transactions");
+  const accountIdsByName = new Map(
+    accounts.flatMap((account) => [
+      [normalizeText(account.name), account.id],
+      [normalizeText(account.name.replace(/^Carteira\s+\d+\s+-\s*/i, "")), account.id],
+    ]),
+  );
   return listFromResponse(await response.json()).map((transaction) => {
     const amount = parseAmount(transaction.amount ?? transaction.value ?? 0);
     const type = String(transaction.type || transaction.transactionType || transaction.direction || "").trim().toUpperCase();
@@ -111,6 +138,19 @@ async function fetchTransactions(key, startDate, endDate) {
     const merchantName = merchant && typeof merchant === "object" ? String(merchant.name || "") : "";
     const description = String(transaction.description || transaction.title || transaction.name || merchantName || "Pierre").slice(0, 120);
     const date = String(transaction.date || transaction.dateTime || transaction.transactionDate || transaction.createdAt || "").slice(0, 10);
+    const account = transaction.account;
+    const accountObject = account && typeof account === "object" ? account : null;
+    const accountName = String(
+      transaction.account_name ||
+      transaction.accountName ||
+      transaction.account_marketing_name ||
+      transaction.accountMarketingName ||
+      accountObject?.name ||
+      accountObject?.accountName ||
+      "",
+    );
+    const directAccountId = transaction.accountId || transaction.account_id ||
+      (typeof account === "string" ? account : "") || accountObject?.id || accountObject?.accountId || "";
     return {
       id: String(transaction.id || transaction.transactionId || transaction._id || ""),
       description,
@@ -118,7 +158,7 @@ async function fetchTransactions(key, startDate, endDate) {
       date,
       type: isDebit ? "expense" : "income",
       category: mapCategory(transaction.category || transaction.categoryName, description),
-      accountId: String(transaction.accountId || transaction.account_id || transaction.account || ""),
+      accountId: String(directAccountId || accountIdsByName.get(normalizeText(accountName)) || ""),
     };
   }).filter((transaction) => transaction.id && transaction.amount > 0 && validDate(transaction.date));
 }

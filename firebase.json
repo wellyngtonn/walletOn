@@ -6,9 +6,6 @@
   "storage": {
     "rules": "storage.rules"
   },
-  "functions": {
-    "source": "functions"
-  },
   "hosting": [{
     "target": "setenta",
     "public": "out",

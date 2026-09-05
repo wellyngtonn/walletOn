@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { syncPierreData } from "@/services/pierre-sync";
+import { refreshPierreData } from "@/services/pierre-sync";
 
 const PIERRE_SYNC_EVENT = "wallet-pierre-sync-complete";
 const PIERRE_SYNC_STORAGE = "wallet-pierre-sync-complete";
@@ -48,7 +48,7 @@ export function usePierreAutoSync({
       startedForUid.current === uid
     ) return;
     startedForUid.current = uid;
-    void syncPierreData(preferredAccountId)
+    void refreshPierreData(preferredAccountId)
       .then(() => markPierreSyncComplete())
       .catch(() => {
         // A falha silenciosa evita bloquear a abertura do app.

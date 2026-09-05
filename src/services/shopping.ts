@@ -7,6 +7,7 @@ import {
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
 import type {
@@ -52,6 +53,7 @@ function storedHistory(snapshotId: string, value: unknown): ShoppingHistory | nu
   return {
     id: snapshotId,
     userId: record.userId,
+    title: typeof record.title === "string" ? record.title : "",
     date: record.date,
     total: record.total,
     items,
@@ -252,6 +254,10 @@ export async function listShoppingHistory(uid: string) {
     .sort((a, b) => b.date.localeCompare(a.date));
 }
 
+export async function updateShoppingHistoryTitle(uid: string, id: string, title: string) {
+  await updateDoc(doc(historyPath(uid), id), { title: title.trim().slice(0, 120) });
+}
+
 export async function createShoppingHistory(
   uid: string,
   data: ShoppingHistoryInput,
@@ -284,5 +290,5 @@ export async function ensureShoppingHistory(
     existing &&
     existing.items.length > 0 &&
     existing.items.some((item) => typeof item.price !== "number");
-  if (needsPriceImport) await createShoppingHistory(uid, data, id);
+  if (needsPriceImport) await updateDoc(reference, { items: data.items, total: data.total });
 }
