@@ -76,6 +76,7 @@ export function Summary({
     <>
       <div className="saldo-mes-card">
         <div className="saldo-mes-main">
+          <span className="saldo-mes-title">Saldo da conta</span>
           <div className="saldo-mes-account">
             {pierreSynced && (
               <span
