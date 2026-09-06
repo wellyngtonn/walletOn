@@ -71,7 +71,6 @@ export function ShoppingPage() {
   const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState("");
-  const [archiving, setArchiving] = useState(false);
   const [editingTitleDate, setEditingTitleDate] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
@@ -414,19 +413,6 @@ export function ShoppingPage() {
     }
   }
 
-  async function archiveCompleted() {
-    if (!user || !completedItems.length || archiving) return;
-    setArchiving(true);
-    try {
-      await archiveShoppingItems(user.uid, completedItems);
-      setActionError("");
-    } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível arquivar a lista.");
-    } finally {
-      setArchiving(false);
-    }
-  }
-
   function historyText(record: ShoppingHistory) {
     const lines = [...record.items]
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
@@ -509,10 +495,6 @@ export function ShoppingPage() {
     <section className="shopping-page">
       <div className="sec-header shopping-header">
         <h2 className="sec-title">Lista de Compras</h2>
-        <div className="shop-header-buttons">
-          <button className="btn-outline btn-sm" type="button" onClick={() => setTab("historico")}>📋 Histórico</button>
-          <button className="btn-outline btn-sm" type="button" onClick={() => void archiveCompleted()} disabled={archiving || !completedItems.length}>{archiving ? "Arquivando..." : "Arquivar concluídas"}</button>
-        </div>
       </div>
 
       <div className="shop-tabs" role="tablist" aria-label="Lista de compras">
