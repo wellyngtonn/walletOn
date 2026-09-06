@@ -5,7 +5,6 @@ import { AuthGuard } from "./auth-guard";
 import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
-import { FinancialAssistant } from "./financial-assistant";
 import { useAuth } from "@/hooks/useAuth";
 import { usePierreBalance } from "@/hooks/usePierreBalance";
 import { usePierreAutoSync } from "@/hooks/usePierreAutoSync";
@@ -113,7 +112,6 @@ function Inner({ children }: { children: React.ReactNode }) {
           year={year}
           onClose={() => setModal(false)}
         />
-        <FinancialAssistant />
       </main>
     </DashboardContext.Provider>
   );

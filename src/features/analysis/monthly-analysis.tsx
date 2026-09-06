@@ -120,16 +120,18 @@ export function MonthlyAnalysis({
 
   const filteredItems = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
-    return monthItems.filter((transaction) => {
-      const matchesType =
-        typeFilter === "all" || transaction.type === typeFilter;
-      const matchesCategory =
-        categoryFilter === "all" || categoryOf(transaction) === categoryFilter;
-      const matchesSearch =
-        !normalizedSearch ||
-        transaction.description.toLowerCase().includes(normalizedSearch);
-      return matchesType && matchesCategory && matchesSearch;
-    });
+    return monthItems
+      .filter((transaction) => {
+        const matchesType =
+          typeFilter === "all" || transaction.type === typeFilter;
+        const matchesCategory =
+          categoryFilter === "all" || categoryOf(transaction) === categoryFilter;
+        const matchesSearch =
+          !normalizedSearch ||
+          transaction.description.toLowerCase().includes(normalizedSearch);
+        return matchesType && matchesCategory && matchesSearch;
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
   }, [categoryFilter, monthItems, search, typeFilter]);
 
   const ranking = useMemo(() => {

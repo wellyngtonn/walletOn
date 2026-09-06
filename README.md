@@ -33,18 +33,6 @@ No [Console do Firebase](https://console.firebase.google.com/):
 
 As chaves públicas do Firebase identificam o projeto, mas a segurança dos dados depende das regras incluídas neste repositório. Nunca use chaves administrativas no navegador.
 
-## Assistente com Vercel Functions e OpenAI
-
-O assistente financeiro usa a Function `api/financial-assistant.ts`, publicada na Vercel. A chave da OpenAI fica somente nas variáveis de ambiente da Vercel.
-
-Configure no projeto da Vercel:
-
-- `OPENAI_API_KEY`: sua chave da OpenAI;
-- `OPENAI_MODEL`: opcional; o padrão é `gpt-5.4-mini`;
-- `FIREBASE_WEB_API_KEY`: chave web pública do Firebase, usada para validar o token do usuário;
-- `ALLOWED_ORIGIN`: domínio que hospeda o frontend, por exemplo `https://setenta.web.app`;
-- `NEXT_PUBLIC_AI_API_URL`: URL completa da Function se o frontend continuar hospedado no Firebase, por exemplo `https://seu-projeto.vercel.app/api/financial-assistant`.
-
 ## Sincronização Pierre com Vercel
 
 A sincronização do Pierre usa `api/pierre.ts` na Vercel e mantém o Firebase apenas para autenticação e Firestore. Isso evita a necessidade de Cloud Functions e do plano Blaze no Firebase.
@@ -57,8 +45,6 @@ Configure também estas variáveis somente no ambiente da Vercel:
 - `NEXT_PUBLIC_PIERRE_API_URL`: URL pública da Function, por exemplo `https://seu-projeto.vercel.app/api/pierre`.
 
 A conta de serviço é usada apenas no servidor para validar o token do usuário, acessar a chave Pierre na coleção privada e gravar transações. Nunca use essas três primeiras variáveis com o prefixo `NEXT_PUBLIC_`.
-
-Se o frontend também for publicado na Vercel, deixe `NEXT_PUBLIC_AI_API_URL` vazio para usar `/api/financial-assistant` no mesmo domínio. A Function consulta o Firestore via REST usando o token autenticado do usuário e não precisa de uma chave privada de service account.
 
 ## Estrutura
 
