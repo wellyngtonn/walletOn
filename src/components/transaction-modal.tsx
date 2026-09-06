@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { createTransaction, updateTransaction } from "@/services/transactions";
 import type { Transaction, TransactionInput, TransactionType } from "@/types";
+import { cleanTransactionName } from "@/utils/transaction-name";
 
 export function TransactionModal({
   open,
@@ -35,7 +36,7 @@ export function TransactionModal({
         transaction
           ? {
               type: transaction.type,
-              description: transaction.description,
+              description: cleanTransactionName(transaction.description),
               amount: transaction.amount,
               date: transaction.date,
               referenceMonth: transaction.referenceMonth,

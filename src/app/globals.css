@@ -459,6 +459,11 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.dashboard-transactions-widget .tx-desc {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .tx-meta {
   font-size: 0.75rem;
   color: var(--text3);
@@ -1210,6 +1215,99 @@ select {
 
 .plan-item-expired {
   opacity: 0.55;
+}
+
+/* Listas de planejamento compactas (Lançamentos Futuros e Recorrências):
+   linha única, sem ícone de categoria, não pagos sempre no topo. */
+.planning-full-card .plan-compact-list .tx-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.plan-compact-list .plan-check {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.plan-compact-list .plan-check:hover {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.plan-compact-list .tx-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-compact-list .tx-desc {
+  display: inline;
+  vertical-align: baseline;
+}
+
+.plan-compact-list .plan-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: 1px;
+}
+
+.plan-compact-list .plan-meta {
+  color: var(--text3);
+  font-size: 0.7rem;
+  margin-left: 6px;
+  vertical-align: 1px;
+}
+
+.plan-compact-list .planning-actions {
+  grid-area: auto;
+  align-self: center;
+  flex-direction: row;
+}
+
+.plan-compact-list .plan-swipe {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+}
+
+.plan-compact-list .plan-swipe-action {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 10px;
+  overflow: hidden;
+  white-space: nowrap;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
 /* ─── LISTA DE COMPRAS ─────────────────────────────────────────────── */

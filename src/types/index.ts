@@ -55,6 +55,8 @@ export interface Recurrence {
   period: RecurrencePeriod;
   limit?: number;
   paid?: boolean;
+  /** Meses já pagos no formato "YYYY-MM" -> true. */
+  paidMonths?: Record<string, boolean>;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

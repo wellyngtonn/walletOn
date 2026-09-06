@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
+import { logout } from "@/services/auth";
 import {
   createShoppingHistory,
   createShoppingItemsBatch,
@@ -40,6 +42,7 @@ const accentColors: { name: AccentColor; hex: string; label: string }[] = [
 
 export default function ConfiguracoesPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [accent, setAccent] = useState<AccentColor>("green");
@@ -226,6 +229,12 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  async function signOut() {
+    setToast("Saindo...");
+    await logout();
+    router.replace("/login");
+  }
+
   if (!mounted) return null;
 
   return (
@@ -303,6 +312,18 @@ export default function ConfiguracoesPage() {
             </button>
           </div>
           <StatementExport onStatus={setToast} embedded />
+        </div>
+
+        <div className="settings-card">
+          <h4 className="settings-card-title">Conta</h4>
+          <p className="settings-card-desc">
+            Saia da sua conta neste dispositivo.
+          </p>
+          <div className="settings-actions">
+            <button onClick={signOut} className="btn-danger">
+              Sair da conta
+            </button>
+          </div>
         </div>
       </div>
 

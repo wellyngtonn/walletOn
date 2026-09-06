@@ -5,6 +5,7 @@ import { deleteTransaction } from "@/services/transactions";
 import type { Transaction, TransactionType } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { pierreCategoryIcon } from "@/utils/pierre-category";
+import { cleanTransactionName } from "@/utils/transaction-name";
 
 const labels: Record<TransactionType, string> = {
   income: "Receita",
@@ -54,7 +55,7 @@ export function TransactionList({
             {pierreCategoryIcon(t.category, t.description, t.type)}
           </div>
           <div className="tx-info">
-            <p className="tx-desc">{t.description}</p>
+            <p className="tx-desc">{cleanTransactionName(t.description)}</p>
             <p className="tx-meta">
               {labels[t.type]} · {dateBR(t.date)}
             </p>

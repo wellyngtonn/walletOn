@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Eye, EyeOff, Pencil } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import type { Transaction } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { pierreCategoryIcon } from "@/utils/pierre-category";
+import { cleanTransactionName } from "@/utils/transaction-name";
 import { ExpenseHeatmap } from "@/components/expense-heatmap";
 import { usePierreSyncStatus } from "@/hooks/usePierreAutoSync";
 
@@ -21,7 +22,6 @@ export function Summary({
   pierreBalance,
   pierreAccountId,
   pierreAccountName,
-  onEdit,
 }: {
   items: Transaction[];
   month: number;
@@ -29,7 +29,6 @@ export function Summary({
   pierreBalance: number | null;
   pierreAccountId: string | null;
   pierreAccountName: string | null;
-  onEdit: (transaction: Transaction) => void;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [valuesHidden, setValuesHidden] = useState(true);
@@ -155,7 +154,9 @@ export function Summary({
                     )}
                   </div>
                   <div className="tx-info">
-                    <p className="tx-desc">{transaction.description}</p>
+                    <p className="tx-desc">
+                      {cleanTransactionName(transaction.description)}
+                    </p>
                     <p className="tx-meta">
                       {typeLabels[transaction.type]} · {dateBR(transaction.date)}
                     </p>
@@ -167,15 +168,6 @@ export function Summary({
                       ? "••••••"
                       : `${transaction.type === "income" ? "+" : "−"} ${currency(transaction.amount)}`}
                   </p>
-                  <button
-                    type="button"
-                    className="tx-action-btn"
-                    onClick={() => onEdit(transaction)}
-                    title={`Editar ${transaction.description}`}
-                    aria-label={`Editar lançamento ${transaction.description}`}
-                  >
-                    <Pencil size={15} aria-hidden="true" />
-                  </button>
                 </div>
               ))}
             </div>

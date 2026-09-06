@@ -49,6 +49,41 @@ export function cosmosProductName(product: { description?: string; brand?: { nam
   return shoppingProductName({ product_name: description, brands: product.brand?.name, quantity }, hasMeasure ? "" : barcode);
 }
 
+// Palavras curtas que permanecem em minúsculas no meio do nome.
+const SMALL_WORDS = new Set([
+  "a", "ao", "aos", "as", "à", "às", "com", "da", "das", "de", "do", "dos",
+  "e", "em", "entre", "na", "nas", "no", "nos", "o", "os", "para", "por",
+  "sem", "sob", "sobre",
+]);
+
+// Unidades de medida usadas isoladas após um número, como em "300 g".
+const MEASURE_UNIT = /^(?:cl|g|kg|l|lt|mg|ml|grs?|kgs?)$/;
+
+// Converte nomes recebidos em CAIXA ALTA para o formato legível, por exemplo
+// "PASSATA RÚSTICA SALSARETTI 300G" vira "Passata Rústica Salsaretti 300g".
+// Nomes que já contêm minúsculas são mantidos como estão.
+export function readableProductName(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  const chars = [...trimmed];
+  const hasUppercaseLetter = chars.some(
+    (char) => char.toUpperCase() === char && char.toLowerCase() !== char,
+  );
+  const hasLowercaseLetter = chars.some(
+    (char) => char.toLowerCase() === char && char.toUpperCase() !== char,
+  );
+  if (!hasUppercaseLetter || hasLowercaseLetter) return trimmed;
+
+  const words = trimmed.toLowerCase().split(/\s+/);
+  return words
+    .map((word, index) => {
+      if (MEASURE_UNIT.test(word)) return word;
+      if (index > 0 && SMALL_WORDS.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
 export function validBarcode(code: string) {
   if (!/^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(code)) return false;
   const digits = [...code].map(Number);

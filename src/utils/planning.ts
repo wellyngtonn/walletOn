@@ -42,6 +42,18 @@ export function periodIndex(year: number, month: number) {
   return year * 12 + month - 1;
 }
 
+export function recurrenceMonthKey(year: number, month: number) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+export function recurrencePaid(
+  recurrence: Recurrence,
+  year: number,
+  month: number,
+) {
+  return recurrence.paidMonths?.[recurrenceMonthKey(year, month)] === true;
+}
+
 function recurrenceStartPeriod(startDate: string) {
   const match = /^(\d{4})-(\d{2})-\d{2}$/.exec(startDate);
   if (!match) return null;

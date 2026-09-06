@@ -5,6 +5,8 @@ import {
   getDescriptionSuggestions,
   recurrenceDate,
   recurrenceExpired,
+  recurrenceMonthKey,
+  recurrencePaid,
   recurrenceScheduled,
   recurrenceStarted,
 } from "../src/utils/planning";
@@ -71,4 +73,14 @@ test("future recurrence remains hidden before its start month", () => {
   assert.equal(recurrenceScheduled(item, 2026, 8), false);
   assert.equal(recurrenceStarted(item, 2026, 9), true);
   assert.equal(recurrenceScheduled(item, 2026, 9), true);
+});
+
+test("pagamento da recorrência fica restrito ao mês marcado", () => {
+  const item = recurrence({
+    paidMonths: { "2026-09": true },
+  });
+  assert.equal(recurrencePaid(item, 2026, 9), true);
+  assert.equal(recurrencePaid(item, 2026, 10), false);
+  assert.equal(recurrenceMonthKey(2026, 9), "2026-09");
+  assert.equal(recurrenceMonthKey(2026, 10), "2026-10");
 });

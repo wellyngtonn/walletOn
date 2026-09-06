@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useAllTransactions } from "@/hooks/useAllTransactions";
 import { useDashboard } from "@/components/app-shell";
@@ -27,6 +27,8 @@ import {
   getDescriptionSuggestions,
   recurrenceDate,
   recurrenceExpired,
+  recurrenceMonthKey,
+  recurrencePaid,
   recurrenceScheduled,
   recurrenceStarted,
 } from "@/utils/planning";
@@ -37,13 +39,6 @@ const CATEGORIES = [
   "Pets", "Restaurantes", "Salário", "Saúde", "Serviços", "Supermercado",
   "Transferências", "Transporte", "Vestuário", "Viagem", "Outros",
 ];
-
-const categoryIcon: Record<string, string> = {
-  Alimentação: "🍱", Transporte: "🚗", Saúde: "💊", Educação: "📚",
-  Lazer: "🎮", Moradia: "🏠", Salário: "💼", Investimento: "📈",
-  Compras: "🛍️", Contas: "📄", Assinaturas: "📱", Pets: "🐾",
-  Outros: "📊",
-};
 
 const emptyPlan = (date: string): PlannedTransactionInput => ({
   type: "expense",
@@ -71,6 +66,119 @@ function todayString() {
 
 function periodLabel(period: RecurrencePeriod) {
   return period === "monthly" ? "Mensal" : period === "quarterly" ? "Trimestral" : "Anual";
+}
+
+const MAX_DRAG = 96;
+const SWIPE_THRESHOLD = 60;
+
+// Arrastar a linha para a direita desloca o cartão, revela "✎ Editar" e
+// dispara a edição no lugar do botão ✎.
+function SwipeToEditRow({
+  className,
+  disabled = false,
+  onSwipe,
+  children,
+}: {
+  className?: string;
+  disabled?: boolean;
+  onSwipe: () => void;
+  children: ReactNode;
+}) {
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressClick = useRef(false);
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+
+  return (
+    <div
+      className="plan-swipe"
+      style={{ touchAction: "pan-y", userSelect: "none" }}
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        dragStart.current = { x: event.clientX, y: event.clientY };
+        suppressClick.current = false;
+        setDragging(true);
+        setDx(0);
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Captura opcional; o gesto segue funcionando sem ela.
+        }
+      }}
+      onPointerMove={(event) => {
+        const start = dragStart.current;
+        if (!start || disabled) return;
+        const rawX = event.clientX - start.x;
+        const rawY = event.clientY - start.y;
+        if (Math.abs(rawX) <= Math.abs(rawY)) return;
+        if (Math.abs(rawX) > 8) suppressClick.current = true;
+        setDx(Math.max(0, Math.min(MAX_DRAG, rawX)));
+      }}
+      onPointerUp={(event) => {
+        const start = dragStart.current;
+        dragStart.current = null;
+        setDragging(false);
+        setDx(0);
+        try {
+          if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        } catch {
+          // Sem captura ativa.
+        }
+        if (!start) return;
+        const rawX = event.clientX - start.x;
+        const rawY = event.clientY - start.y;
+        if (
+          !disabled &&
+          rawX >= SWIPE_THRESHOLD &&
+          Math.abs(rawX) > Math.abs(rawY) * 1.15
+        ) {
+          suppressClick.current = true;
+          onSwipe();
+        }
+      }}
+      onPointerCancel={(event) => {
+        dragStart.current = null;
+        setDragging(false);
+        setDx(0);
+        try {
+          if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        } catch {
+          // Sem captura ativa.
+        }
+      }}
+      onClickCapture={(event) => {
+        if (suppressClick.current) {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressClick.current = false;
+        }
+      }}
+    >
+      <div
+        className="plan-swipe-action"
+        aria-hidden="true"
+        style={{
+          width: disabled ? 0 : dx,
+          transition: dragging ? "none" : "width 200ms ease",
+        }}
+      >
+        ✎ Editar
+      </div>
+      <div
+        className={className}
+        style={{
+          transform: dx > 0 && !disabled ? `translateX(${dx}px)` : undefined,
+          transition: dragging ? "none" : "transform 200ms ease",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function PlanningPage() {
@@ -110,10 +218,15 @@ export function PlanningPage() {
 
   const monthPlans = useMemo(
     () =>
-      plans.filter((plan) => {
-        const date = new Date(`${plan.date}T12:00:00`);
-        return date.getMonth() + 1 === month && date.getFullYear() === year;
-      }),
+      plans
+        .filter((plan) => {
+          const date = new Date(`${plan.date}T12:00:00`);
+          return date.getMonth() + 1 === month && date.getFullYear() === year;
+        })
+        .sort(
+          (a, b) =>
+            Number(a.paid || false) - Number(b.paid || false),
+        ),
     [month, plans, year],
   );
   const scheduledRecurrences = useMemo(
@@ -121,7 +234,14 @@ export function PlanningPage() {
     [month, recurrences, year],
   );
   const startedRecurrences = useMemo(
-    () => recurrences.filter((recurrence) => recurrenceStarted(recurrence, year, month)),
+    () =>
+      recurrences
+        .filter((recurrence) => recurrenceStarted(recurrence, year, month))
+        .sort(
+          (a, b) =>
+            Number(recurrencePaid(a, year, month)) -
+            Number(recurrencePaid(b, year, month)),
+        ),
     [month, recurrences, year],
   );
   const predictedIncome =
@@ -288,6 +408,10 @@ export function PlanningPage() {
 
   async function toggleRecurrence(recurrence: Recurrence) {
     if (!user) return;
+    const monthKey = recurrenceMonthKey(year, month);
+    const paidMonths = { ...(recurrence.paidMonths || {}) };
+    if (paidMonths[monthKey]) delete paidMonths[monthKey];
+    else paidMonths[monthKey] = true;
     const data: RecurrenceInput = {
       type: recurrence.type,
       description: recurrence.description,
@@ -296,7 +420,7 @@ export function PlanningPage() {
       originalDay: recurrence.originalDay,
       category: recurrence.category,
       period: recurrence.period,
-      paid: !recurrence.paid,
+      paidMonths,
     };
     if (recurrence.limit) data.limit = recurrence.limit;
     try {
@@ -357,18 +481,33 @@ export function PlanningPage() {
       <div className="widget planning-full-card">
         <div className="planning-widget-header"><h3 className="planning-widget-title">Lançamentos Futuros</h3></div>
         {!monthPlans.length ? <p className="tx-empty">Nenhum lançamento planejado.</p> : (
-          <div className="tx-list">
+          <div className="tx-list plan-compact-list">
             {monthPlans.map((plan) => (
-              <div className={`tx-item ${plan.paid ? "plan-item-paid" : ""}`} key={plan.id}>
-                <div className={`tx-icon ${plan.type === "income" ? "in" : "out"}`}>{categoryIcon[plan.category] || "📊"}</div>
-                <div className="tx-info"><span className="tx-desc">{plan.description}</span><span className="tx-meta">{plan.category} · {dateBR(plan.date)}</span></div>
+              <SwipeToEditRow
+                className={`tx-item${plan.paid ? " plan-item-paid" : ""}`}
+                key={plan.id}
+                onSwipe={() => openPlan(plan)}
+              >
+                <button
+                  className="plan-check"
+                  type="button"
+                  onClick={() => void togglePlan(plan)}
+                  title={plan.paid ? "Marcar como não pago" : "Marcar como pago"}
+                  aria-label={`${plan.description}: ${plan.paid ? "marcar como não pago" : "marcar como pago"}`}
+                  aria-pressed={plan.paid || false}
+                >
+                  {plan.paid ? "✓" : "◯"}
+                </button>
+                <div className="tx-info">
+                  <span className="tx-desc">{plan.description}</span>
+                  <span className="plan-badge">{plan.category}</span>
+                  <span className="plan-meta">{dateBR(plan.date)}</span>
+                </div>
                 <span className={`tx-val ${plan.type === "income" ? "in" : "out"}`}>{plan.type === "income" ? "+" : "−"} {currency(plan.amount)}</span>
                 <div className="planning-actions">
-                  <button onClick={() => void togglePlan(plan)} title={plan.paid ? "Marcar como não pago" : "Marcar como pago"}>{plan.paid ? "✓" : "◯"}</button>
-                  {!plan.paid && <button onClick={() => openPlan(plan)} title="Editar">✎</button>}
-                  <button onClick={() => void removePlan(plan)} title="Excluir">×</button>
+                  <button type="button" onClick={() => void removePlan(plan)} title="Excluir" aria-label={`Excluir ${plan.description}`}>×</button>
                 </div>
-              </div>
+              </SwipeToEditRow>
             ))}
           </div>
         )}
@@ -377,20 +516,39 @@ export function PlanningPage() {
       <div className="widget planning-full-card">
         <div className="planning-widget-header"><h3 className="planning-widget-title">Recorrências Ativas</h3></div>
         {!startedRecurrences.length ? <p className="tx-empty">Nenhuma recorrência iniciada neste mês.</p> : (
-          <div className="tx-list">
+          <div className="tx-list plan-compact-list">
             {startedRecurrences.map((recurrence) => {
               const expired = recurrenceExpired(recurrence, year, month);
+              const paid = recurrencePaid(recurrence, year, month);
               return (
-                <div className={`tx-item ${expired ? "plan-item-expired" : ""} ${recurrence.paid ? "plan-item-paid" : ""}`} key={recurrence.id}>
-                  <div className={`tx-icon ${recurrence.type === "income" ? "in" : "out"}`}>{categoryIcon[recurrence.category] || "📊"}</div>
-                  <div className="tx-info"><span className="tx-desc">{recurrence.description}</span><span className="tx-meta">{recurrence.category} · {periodLabel(recurrence.period)}{expired ? " · expirada" : ""}</span></div>
+                <SwipeToEditRow
+                  className={`tx-item${expired ? " plan-item-expired" : ""}${paid ? " plan-item-paid" : ""}`}
+                  key={recurrence.id}
+                  disabled={paid}
+                  onSwipe={() => openRecurrence(recurrence)}
+                >
+                  <button
+                    className="plan-check"
+                    type="button"
+                    onClick={() => void toggleRecurrence(recurrence)}
+                    title={paid ? "Marcar como não pago neste mês" : "Marcar como pago neste mês"}
+                    aria-label={`${recurrence.description}: ${paid ? "marcar como não pago neste mês" : "marcar como pago neste mês"}`}
+                    aria-pressed={paid}
+                  >
+                    {paid ? "✓" : "◯"}
+                  </button>
+                  <div className="tx-info">
+                    <span className="tx-desc">{recurrence.description}</span>
+                    <span className="plan-badge">{recurrence.category}</span>
+                    <span className="plan-meta">
+                      {periodLabel(recurrence.period)}{expired ? " · expirada" : ""}
+                    </span>
+                  </div>
                   <span className={`tx-val ${recurrence.type === "income" ? "in" : "out"}`}>{recurrence.type === "income" ? "+" : "−"} {currency(recurrence.amount)}</span>
                   <div className="planning-actions">
-                    <button onClick={() => void toggleRecurrence(recurrence)} title={recurrence.paid ? "Marcar como não pago" : "Marcar como pago"}>{recurrence.paid ? "✓" : "◯"}</button>
-                    {!recurrence.paid && <button onClick={() => openRecurrence(recurrence)} title="Editar">✎</button>}
-                    <button onClick={() => void removeRecurrence(recurrence)} title="Excluir">×</button>
+                    <button type="button" onClick={() => void removeRecurrence(recurrence)} title="Excluir" aria-label={`Excluir ${recurrence.description}`}>×</button>
                   </div>
-                </div>
+                </SwipeToEditRow>
               );
             })}
           </div>

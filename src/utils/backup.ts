@@ -201,6 +201,14 @@ export function normalizeRecurrence(
     paid: item.paid === true,
   };
   if (limitNumber > 0) data.limit = limitNumber;
+  const rawPaidMonths = recordOf(item.paidMonths);
+  if (rawPaidMonths) {
+    const paidMonths: Record<string, boolean> = {};
+    Object.keys(rawPaidMonths).forEach((key) => {
+      if (rawPaidMonths[key] === true) paidMonths[key] = true;
+    });
+    if (Object.keys(paidMonths).length) data.paidMonths = paidMonths;
+  }
   return {
     oldId: stringValue(item.id),
     id: importId("rec", item.id),

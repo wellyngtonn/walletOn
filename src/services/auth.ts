@@ -30,6 +30,11 @@ export async function signInGoogle() {
   await saveGoogleUser(result.user);
 }
 
+export async function signInGoogleRedirect() {
+  const provider = new GoogleAuthProvider();
+  await signInWithRedirect(auth, provider);
+}
+
 async function saveGoogleUser(user: { uid: string; displayName: string | null; email: string | null }) {
   await setDoc(
     doc(db, "users", user.uid),

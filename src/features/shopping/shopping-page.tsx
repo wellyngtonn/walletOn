@@ -19,7 +19,7 @@ import type {
 } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { INITIAL_SHOPPING_HISTORY } from "@/features/shopping/historical-data";
-import { validBarcode } from "@/utils/shopping-product";
+import { readableProductName, validBarcode } from "@/utils/shopping-product";
 import { lookupBarcode } from "@/services/barcode";
 
 type ShopTab = "ativa" | "historico";
@@ -430,7 +430,7 @@ export function ShoppingPage() {
   function historyText(record: ShoppingHistory) {
     const lines = [...record.items]
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-      .map((item) => `${item.qty}x ${item.name}${item.price ? ` — ${currency(item.price)} cada` : ""}`);
+      .map((item) => `${item.qty}x ${readableProductName(item.name)}${item.price ? ` — ${currency(item.price)} cada` : ""}`);
 
     return [...(record.title ? [`*${record.title}*`] : []), `*${record.date ? dateBR(record.date) : "Sem data"}*`, `*${currency(record.total)}*`, ...lines].join("\n");
   }
@@ -565,7 +565,7 @@ export function ShoppingPage() {
               {!activeItems.length ? <div className="tx-empty">Lista vazia. Adicione itens para começar!</div> : activeItems.map((item) => (
                 <div key={item.id} className="shop-item">
                   <button className="shop-check" type="button" onClick={() => void toggleItem(item)} aria-label={`Concluir ${item.name}`}>◯</button>
-                  <div className="shop-info"><span className="shop-name">📦 {item.name}</span><div className="shop-qty-row"><span className="shop-qty">{item.qty}x</span>{editingPriceId === item.id ? <div className="shop-price-editor"><input autoFocus className="shop-price-input" type="number" min="0" step="0.01" value={editingPrice} onChange={(event) => setEditingPrice(event.target.value)} onBlur={(event) => { if (!(event.relatedTarget as HTMLElement | null)?.classList.contains("shop-price-action")) void savePrice(item); }} onKeyDown={(event) => { if (event.key === "Enter") void savePrice(item); if (event.key === "Escape") setEditingPriceId(null); }} /><button className="shop-price-action shop-price-action--ghost" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setEditingPriceId(null)} aria-label="Cancelar edição"><X size={13} /></button></div> : <button className="shop-price-btn" type="button" onClick={() => beginPriceEdit(item)}>{item.price > 0 ? currency(item.price) : "Definir preço"}</button>}</div></div>
+                  <div className="shop-info"><span className="shop-name">📦 {readableProductName(item.name)}</span><div className="shop-qty-row"><span className="shop-qty">{item.qty}x</span>{editingPriceId === item.id ? <div className="shop-price-editor"><input autoFocus className="shop-price-input" type="number" min="0" step="0.01" value={editingPrice} onChange={(event) => setEditingPrice(event.target.value)} onBlur={(event) => { if (!(event.relatedTarget as HTMLElement | null)?.classList.contains("shop-price-action")) void savePrice(item); }} onKeyDown={(event) => { if (event.key === "Enter") void savePrice(item); if (event.key === "Escape") setEditingPriceId(null); }} /><button className="shop-price-action shop-price-action--ghost" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setEditingPriceId(null)} aria-label="Cancelar edição"><X size={13} /></button></div> : <button className="shop-price-btn" type="button" onClick={() => beginPriceEdit(item)}>{item.price > 0 ? currency(item.price) : "Definir preço"}</button>}</div></div>
                   <span className="shop-total">{currency(item.qty * item.price)}</span>
                   <button className="tx-del" type="button" onClick={() => void removeItem(item)} aria-label={`Excluir ${item.name}`}>×</button>
                 </div>
@@ -611,7 +611,7 @@ export function ShoppingPage() {
                     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
                     .map((item, index) => (
                       <li className="shop-historico-line" key={`${item.name}-${index}`}>
-                        <span>{item.qty}x {item.name}</span>
+                        <span>{item.qty}x {readableProductName(item.name)}</span>
                         {item.price ? (
                           <span className="shop-historico-line-price">
                             {currency(item.price)} cada

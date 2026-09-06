@@ -41,7 +41,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool);
     }
     function validRecurrence(uid) {
-      return request.resource.data.keys().hasOnly(['userId','type','description','amount','startDate','originalDay','category','period','limit','paid','createdAt','updatedAt'])
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','startDate','originalDay','category','period','limit','paid','paidMonths','createdAt','updatedAt'])
         && request.resource.data.keys().hasAll(['userId','type','description','amount','startDate','originalDay','category','period','updatedAt'])
         && request.resource.data.userId == uid
         && request.resource.data.type in ['income','expense']
@@ -60,7 +60,11 @@ service cloud.firestore {
         && request.resource.data.category.size() <= 60
         && request.resource.data.period in ['monthly','quarterly','yearly']
         && (!request.resource.data.keys().hasAny(['limit']) || (request.resource.data.limit is int && request.resource.data.limit >= 1))
-        && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool);
+        && (!request.resource.data.keys().hasAny(['paid']) || request.resource.data.paid is bool)
+        && (!request.resource.data.keys().hasAny(['paidMonths'])
+          || (request.resource.data.paidMonths is map
+            && request.resource.data.paidMonths.values().hasOnly([true])
+            && request.resource.data.paidMonths.size() <= 600));
     }
     function validShoppingItem(uid) {
       return request.resource.data.keys().hasOnly(['userId','name','qty','price','done','createdDate','completedDate','order','createdAt','updatedAt'])

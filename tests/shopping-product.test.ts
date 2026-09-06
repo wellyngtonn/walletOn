@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shoppingProductName, cosmosProductName, upcProductName, validBarcode } from "../src/utils/shopping-product";
+import { shoppingProductName, cosmosProductName, upcProductName, validBarcode, readableProductName } from "../src/utils/shopping-product";
 
 test("completa o arroz do exemplo com marca e peso informado", () => {
   assert.equal(shoppingProductName({ product_name: "Arroz", brands: "Tio lautério" }, "7896559100215"), "Arroz Tio lautério 5 kg");
@@ -39,4 +39,18 @@ test("UPCitemdb exige o mesmo código e preserva medida da embalagem", () => {
   assert.equal(upcProductName({ items: [{ ean: "7891910000197", title: "Açúcar" }] }, "7896559100215"), "");
   assert.equal(upcProductName({ items: [] }, "7896559100215"), "");
   assert.equal(upcProductName({ items: [{ ean: "0012345678905", title: "Item", brand: "Marca" }] }, "012345678905"), "Item Marca");
+});
+
+test("formata nomes em caixa alta para o formato legível", () => {
+  assert.equal(readableProductName("PASSATA RÚSTICA SALSARETTI 300G"), "Passata Rústica Salsaretti 300g");
+  assert.equal(readableProductName("DETERGENTE LÍQUIDO 500ML"), "Detergente Líquido 500ml");
+  assert.equal(readableProductName("PÃO DE QUEIJO 1KG"), "Pão de Queijo 1kg");
+  assert.equal(readableProductName("PASSATA SALSARETTI 300 G"), "Passata Salsaretti 300 g");
+});
+
+test("não altera nomes que já possuem minúsculas", () => {
+  assert.equal(readableProductName("Arroz Tio Lautério 5Kg"), "Arroz Tio Lautério 5Kg");
+  assert.equal(readableProductName("Suco tang"), "Suco tang");
+  assert.equal(readableProductName("300"), "300");
+  assert.equal(readableProductName(""), "");
 });

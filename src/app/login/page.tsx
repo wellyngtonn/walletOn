@@ -7,7 +7,13 @@ import {
   completeGoogleRedirect,
   signInEmail,
   signInGoogle,
+  signInGoogleRedirect,
 } from "@/services/auth";
+
+const isLocalDev =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1");
 
 export default function Login() {
   const { user } = useAuth();
@@ -49,7 +55,8 @@ export default function Login() {
   }
 
   function enterWithGoogle() {
-    void signInGoogle().catch((err) => {
+    const flow = isLocalDev ? signInGoogleRedirect : signInGoogle;
+    void flow().catch((err) => {
       const code = err && typeof err === "object" && "code" in err ? err.code : "";
       const message =
         code === "auth/unauthorized-domain"

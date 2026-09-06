@@ -16,6 +16,7 @@
     "src/utils/format.ts",
     "src/utils/statement.ts",
     "src/utils/statement-pdf.ts",
+    "src/utils/transaction-name.ts",
     "src/types/index.ts",
     "tests/**/*.test.ts"
   ]

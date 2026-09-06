@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { cleanTransactionName } from "../src/utils/transaction-name";
 
 type VercelRequest = IncomingMessage & { body?: unknown };
 type VercelResponse = ServerResponse & {
@@ -208,9 +209,9 @@ async function fetchTransactions(
     const merchantName = merchant && typeof merchant === "object"
       ? String((merchant as Record<string, unknown>).name || "")
       : "";
-    const description = String(
+    const description = cleanTransactionName(String(
       transaction.description || transaction.title || transaction.name || merchantName || "Pierre",
-    ).slice(0, 120);
+    )).slice(0, 120);
     const date = String(
       transaction.date || transaction.dateTime || transaction.transactionDate || transaction.createdAt || "",
     ).slice(0, 10);

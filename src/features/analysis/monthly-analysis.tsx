@@ -14,6 +14,7 @@ import { TransactionList } from "@/components/transaction-list";
 import type { Transaction, TransactionType } from "@/types";
 import { currency } from "@/utils/format";
 import { filterPierreMovements } from "@/utils/pierre";
+import { cleanTransactionName } from "@/utils/transaction-name";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -226,7 +227,7 @@ export function MonthlyAnalysis({
       rows.push(
         [
           transaction.date,
-          escapeCsv(transaction.description),
+          escapeCsv(cleanTransactionName(transaction.description)),
           TYPE_LABELS[transaction.type],
           escapeCsv(categoryOf(transaction)),
           transaction.amount.toFixed(2).replace(".", ","),
