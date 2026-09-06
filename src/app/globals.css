@@ -768,6 +768,11 @@ select {
   flex-direction: column;
 }
 
+.dashboard-panel-grid > .heatmap-widget {
+  height: auto;
+  align-self: start;
+}
+
 .hm-days {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -786,7 +791,7 @@ select {
 .hm-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: 1fr;
+  grid-auto-rows: auto;
   gap: 2px;
   flex: 1;
   min-height: 0;
