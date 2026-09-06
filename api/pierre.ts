@@ -1,7 +1,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { cleanTransactionName } from "../src/utils/transaction-name";
+import { cleanTransactionName } from "../src/utils/transaction-name.js";
 
 type VercelRequest = IncomingMessage & { body?: unknown };
 type VercelResponse = ServerResponse & {
