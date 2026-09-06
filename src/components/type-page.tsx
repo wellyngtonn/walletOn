@@ -2,7 +2,6 @@
 import type { TransactionType } from "@/types";
 import { useDashboard } from "./app-shell";
 import { TransactionList } from "./transaction-list";
-import { MonthPicker } from "./month-picker";
 
 const meta = {
   income: ["Receitas", "Nenhuma receita neste mês."],
@@ -12,9 +11,6 @@ const meta = {
 
 export function TypePage({ type }: { type: TransactionType }) {
   const {
-    month,
-    year,
-    setPeriod,
     transactions,
     loading,
     error,
@@ -27,16 +23,11 @@ export function TypePage({ type }: { type: TransactionType }) {
   return (
     <>
       <div className="mb-5 flex items-center justify-between gap-3">
-        <div>
-          <h2 className="sec-title">{title}</h2>
-          <div className="mt-2 md:hidden">
-            <MonthPicker month={month} year={year} onChange={setPeriod} />
-          </div>
-        </div>
+        <h2 className="sec-title">{title}</h2>
         <button
           type="button"
           onClick={openCreate}
-          className="btn-primary mt-2 rounded-full px-5 py-3 text-lg font-bold md:mt-0 md:rounded-[10px] md:px-4 md:py-[9px] md:text-sm"
+          className="btn-primary rounded-full px-5 py-3 text-lg font-bold md:rounded-[10px] md:px-4 md:py-[9px] md:text-sm"
         >
           <span className="md:hidden">+</span>
           <span className="hidden md:inline">+ Lançamento</span>

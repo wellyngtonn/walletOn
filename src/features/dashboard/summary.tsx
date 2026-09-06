@@ -75,34 +75,33 @@ export function Summary({
   return (
     <>
       <div className="saldo-mes-card">
-        <div className="saldo-mes-account">
-          {pierreSynced && (
-            <span
-              className="pierre-sync-dot"
-              title="Pierre Finance sincronizado"
-              aria-label="Pierre Finance sincronizado"
-            />
-          )}
-          <span className="saldo-mes-account-name">{accountLabel}</span>
-          <span className="saldo-mes-account-label">SALDO</span>
-        </div>
-        <div className="saldo-mes-balance">
-          <div className="saldo-mes-actions" aria-label="Controles do saldo">
-            <button
-              type="button"
-              className="saldo-mes-action"
-              title={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
-              aria-label={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
-              onClick={() => setValuesHidden((hidden) => !hidden)}
-            >
-              {valuesHidden ? (
-                <EyeOff size={16} aria-hidden="true" />
-              ) : (
-                <Eye size={16} aria-hidden="true" />
-              )}
-            </button>
+        <div className="saldo-mes-main">
+          <div className="saldo-mes-account">
+            {pierreSynced && (
+              <span
+                className="pierre-sync-dot"
+                title="Pierre Finance sincronizado"
+                aria-label="Pierre Finance sincronizado"
+              />
+            )}
+            <span className="saldo-mes-account-name">{accountLabel}</span>
           </div>
           <span className="saldo-mes-value">{displayedBalance}</span>
+        </div>
+        <div className="saldo-mes-actions" aria-label="Controles do saldo">
+          <button
+            type="button"
+            className="saldo-mes-action"
+            title={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
+            aria-label={valuesHidden ? "Mostrar valores" : "Ocultar valores"}
+            onClick={() => setValuesHidden((hidden) => !hidden)}
+          >
+            {valuesHidden ? (
+              <EyeOff size={16} aria-hidden="true" />
+            ) : (
+              <Eye size={16} aria-hidden="true" />
+            )}
+          </button>
         </div>
       </div>
 

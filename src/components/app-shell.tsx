@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AuthGuard } from "./auth-guard";
 import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
@@ -34,6 +35,7 @@ export const useDashboard = () => {
 
 function Inner({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const pathname = usePathname();
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [modal, setModal] = useState(false);
@@ -86,18 +88,23 @@ function Inner({ children }: { children: React.ReactNode }) {
       <main
         className="app-shell-main min-h-screen px-4 pb-32 pt-20 md:px-7 md:pt-7"
       >
-        <header className="mb-5 flex items-center justify-end">
-          <div className="flex items-center gap-2">
-            <MonthPicker
-              month={month}
-              year={year}
-              onChange={(m, y) => {
-                setMonth(m);
-                setYear(y);
-              }}
-            />
-          </div>
-        </header>
+        {pathname === "/analise" ||
+        pathname === "/planejamento" ||
+        pathname === "/analise/" ||
+        pathname === "/planejamento/" ? (
+          <header className="mb-5 flex items-center justify-end">
+            <div className="flex items-center gap-2">
+              <MonthPicker
+                month={month}
+                year={year}
+                onChange={(m, y) => {
+                  setMonth(m);
+                  setYear(y);
+                }}
+              />
+            </div>
+          </header>
+        ) : null}
         <div className="mx-auto max-w-[1160px]">{children}</div>
         <TransactionModal
           open={modal}
