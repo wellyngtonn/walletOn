@@ -1,5 +1,5 @@
 "use client";
-import { Menu } from "lucide-react";
+import { Menu, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -7,9 +7,9 @@ import { useAuth } from "@/hooks/useAuth";
 
 const links = [
   { href: "/resumo", label: "Painel" },
-  { href: "/analise", label: "Análise Mensal" },
+  { href: "/analise", label: "Análise" },
   { href: "/planejamento", label: "Plano" },
-  { href: "/compras", label: "Lista de Compras" },
+  { href: "/compras", label: "Compras" },
   { href: "/configuracoes", label: "Ajustes" },
 ];
 
@@ -18,6 +18,7 @@ export function Sidebar() {
   const router = useRouter();
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const isConfig = path === "/configuracoes" || path === "/configuracoes/";
   const initial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "?";
   const name = user?.displayName || user?.email || "Usuário";
 
@@ -31,6 +32,36 @@ export function Sidebar() {
         <Menu size={22} />
       </button>
 
+      <Link
+        href="/configuracoes"
+        onClick={(event) => {
+          if (isConfig) {
+            event.preventDefault();
+            const previous =
+              window.sessionStorage.getItem("wallet-prev-page") || "/resumo";
+            router.push(previous);
+          } else {
+            window.sessionStorage.setItem("wallet-prev-page", path);
+          }
+        }}
+        onMouseEnter={() => router.prefetch("/configuracoes")}
+        onFocus={() => router.prefetch("/configuracoes")}
+        onTouchStart={() => router.prefetch("/configuracoes")}
+        className="fixed right-4 top-4 z-50 rounded-xl bg-[var(--card)] p-2 shadow dark:bg-transparent dark:shadow-none"
+        style={
+          isConfig
+            ? {
+                background: "var(--accent-light)",
+                color: "var(--accent)",
+              }
+            : undefined
+        }
+        aria-label={isConfig ? "Voltar à página anterior" : "Configurações"}
+        title={isConfig ? "Voltar" : "Configurações"}
+      >
+        <Settings size={22} />
+      </Link>
+
       {open && (
         <button
           className="fixed inset-0 z-30 bg-black/45"
@@ -40,7 +71,7 @@ export function Sidebar() {
       )}
 
       <aside
-        className="fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 pt-20 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
+        className="fixed inset-y-0 left-0 z-40 flex w-[228px] flex-col border-r border-[var(--card-border)] bg-[var(--card)] p-4 pt-20 shadow-sm transition-transform duration-[350ms] ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{
           transform: open ? "translateX(0)" : "translateX(-100%)",
         }}
@@ -48,7 +79,12 @@ export function Sidebar() {
         <nav className="flex flex-1 flex-col gap-1">
           {links.map(({ href, label }) => (
             <Link
-              onClick={() => setOpen(false)}
+              onClick={() => {
+                setOpen(false);
+                if (href === "/configuracoes" && !isConfig) {
+                  window.sessionStorage.setItem("wallet-prev-page", path);
+                }
+              }}
               onMouseEnter={() => router.prefetch(href)}
               onFocus={() => router.prefetch(href)}
               onTouchStart={() => router.prefetch(href)}
@@ -72,9 +108,19 @@ export function Sidebar() {
 
         <div className="border-t border-[var(--card-border)] pt-4">
           <div className="flex items-center gap-3 rounded-[14px] bg-[var(--bg)] p-3">
-            <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[0.95rem] font-bold text-white">
-              {initial.toUpperCase()}
-            </div>
+            {user?.photoURL ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.photoURL}
+                alt=""
+                referrerPolicy="no-referrer"
+                className="h-[38px] w-[38px] shrink-0 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[0.95rem] font-bold text-white">
+                {initial.toUpperCase()}
+              </div>
+            )}
             <div className="min-w-0">
               <span className="block truncate text-[0.88rem] font-bold text-[var(--text)]">
                 {name}

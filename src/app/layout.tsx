@@ -1,7 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Manrope } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 import { MobileZoomLock } from "@/components/mobile-zoom-lock";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["700", "800"],
+  variable: "--font-manrope",
+  display: "swap",
+});
 export const metadata: Metadata = {
   title: { default: "WalletON", template: "%s | WalletON" },
   description: "Sua vida financeira, simples e organizada.",
@@ -23,7 +31,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className="scrollbar-none">
-      <body>
+      <body className={manrope.variable}>
         <MobileZoomLock />
         <Providers>{children}</Providers>
       </body>

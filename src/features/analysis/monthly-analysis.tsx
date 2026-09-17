@@ -11,10 +11,9 @@ import {
   YAxis,
 } from "recharts";
 import { TransactionList } from "@/components/transaction-list";
-import type { Transaction, TransactionType } from "@/types";
+import type { Transaction } from "@/types";
 import { currency } from "@/utils/format";
 import { filterPierreMovements } from "@/utils/pierre";
-import { cleanTransactionName } from "@/utils/transaction-name";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -40,12 +39,6 @@ const CATEGORY_META: Record<string, { icon: string; color: string }> = {
   Outros: { icon: "📊", color: "#8e8e93" },
 };
 
-const TYPE_LABELS: Record<TransactionType, string> = {
-  income: "Receita",
-  expense: "Despesa",
-  investment: "Investimento",
-};
-
 function categoryOf(transaction: Transaction) {
   return transaction.category || "Outros";
 }
@@ -62,20 +55,6 @@ function periodTransactions(items: Transaction[], month: number, year: number) {
     const date = new Date(`${transaction.date}T12:00:00`);
     return date.getMonth() === month && date.getFullYear() === year;
   });
-}
-
-function escapeCsv(value: string | number) {
-  return `"${String(value).replaceAll('"', '""')}"`;
-}
-
-function download(name: string, content: string, type: string) {
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([content], { type }));
-  link.download = name;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href);
 }
 
 export function MonthlyAnalysis({
@@ -223,34 +202,10 @@ export function MonthlyAnalysis({
     };
   }, [month, trends.currentExpenses, year]);
 
-  function exportCsv() {
-    const rows = ["Data,Descrição,Tipo,Categoria,Valor"];
-    filteredItems.forEach((transaction) => {
-      rows.push(
-        [
-          transaction.date,
-          escapeCsv(cleanTransactionName(transaction.description)),
-          TYPE_LABELS[transaction.type],
-          escapeCsv(categoryOf(transaction)),
-          transaction.amount.toFixed(2).replace(".", ","),
-        ].join(","),
-      );
-    });
-    download(`analise-${year}-${String(month).padStart(2, "0")}.csv`, rows.join("\n"), "text/csv;charset=utf-8");
-  }
-
-  function exportJson() {
-    download(
-      `analise-${year}-${String(month).padStart(2, "0")}.json`,
-      JSON.stringify(filteredItems, null, 2),
-      "application/json",
-    );
-  }
-
   return (
     <>
       <div className="mb-5">
-        <h2 className="sec-title">Análise Mensal</h2>
+        <h2 className="sec-title">Análise</h2>
       </div>
 
       <div className="analysis-filters">
@@ -390,10 +345,6 @@ export function MonthlyAnalysis({
       <div className="widget analysis-full-card analysis-transactions-card">
         <div className="analysis-widget-header">
           <h3 className="analysis-widget-title">Todas as Transações</h3>
-          <div className="analysis-export-actions">
-            <button className="btn-outline" onClick={exportCsv}>CSV</button>
-            <button className="btn-outline" onClick={exportJson}>JSON</button>
-          </div>
         </div>
         <div className="analysis-search-area">
           <input

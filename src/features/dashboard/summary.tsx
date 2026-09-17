@@ -115,7 +115,7 @@ export function Summary({
           onSelectDay={setSelectedDay}
           valuesHidden={valuesHidden}
         />
-        <div className="widget dashboard-transactions-widget flex max-h-[558px] flex-col overflow-hidden">
+        <div className="widget dashboard-transactions-widget flex flex-col">
           <div className="mb-3 flex items-center justify-between">
             {selectedDay && (
               <button

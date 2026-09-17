@@ -36,8 +36,8 @@ import {
 const accentColors: { name: AccentColor; hex: string; label: string }[] = [
   { name: "blue", hex: "#2979ff", label: "Azul" },
   { name: "green", hex: "#15b985", label: "Verde" },
-  { name: "purple", hex: "#a64ce6", label: "Roxo" },
   { name: "orange", hex: "#ff701c", label: "Laranja" },
+  { name: "gray", hex: "#8e8e93", label: "Cinza" },
 ];
 
 export default function ConfiguracoesPage() {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { shoppingProductName, cosmosProductName, upcProductName, validBarcode, readableProductName } from "../src/utils/shopping-product";
+import { shoppingProductName, cosmosProductName, upcProductName, validBarcode, readableProductName, capitalizeProductName } from "../src/utils/shopping-product";
 
 test("completa o arroz do exemplo com marca e peso informado", () => {
   assert.equal(shoppingProductName({ product_name: "Arroz", brands: "Tio lautério" }, "7896559100215"), "Arroz Tio lautério 5 kg");
@@ -53,4 +53,15 @@ test("não altera nomes que já possuem minúsculas", () => {
   assert.equal(readableProductName("Suco tang"), "Suco tang");
   assert.equal(readableProductName("300"), "300");
   assert.equal(readableProductName(""), "");
+});
+
+test("capitaliza cada palavra da descrição", () => {
+  assert.equal(capitalizeProductName("hemmer ketchup tradicional heinz 1 kg"), "Hemmer Ketchup Tradicional Heinz 1 kg");
+  assert.equal(capitalizeProductName("suco tang"), "Suco Tang");
+  assert.equal(capitalizeProductName("leite integral 1l"), "Leite Integral 1l");
+  assert.equal(capitalizeProductName("PASSATA RÚSTICA SALSARETTI 300G"), "Passata Rústica Salsaretti 300g");
+  assert.equal(capitalizeProductName("pão de queijo 500g"), "Pão de Queijo 500g");
+  assert.equal(capitalizeProductName("água com gás"), "Água com Gás");
+  assert.equal(capitalizeProductName("300"), "300");
+  assert.equal(capitalizeProductName(""), "");
 });

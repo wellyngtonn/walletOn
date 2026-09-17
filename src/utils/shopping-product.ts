@@ -59,6 +59,19 @@ const SMALL_WORDS = new Set([
 // Unidades de medida usadas isoladas após um número, como em "300 g".
 const MEASURE_UNIT = /^(?:cl|g|kg|l|lt|mg|ml|grs?|kgs?)$/;
 
+// Capitaliza cada palavra de uma descrição, mantendo conectivos e unidades de
+// medida em minúsculas, por exemplo "HEINZ KETCHUP 1 KG" vira "Heinz Ketchup 1 kg".
+function titleCaseWords(trimmed: string) {
+  const words = trimmed.toLowerCase().split(/\s+/);
+  return words
+    .map((word, index) => {
+      if (MEASURE_UNIT.test(word)) return word;
+      if (index > 0 && SMALL_WORDS.has(word)) return word;
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
 // Converte nomes recebidos em CAIXA ALTA para o formato legível, por exemplo
 // "PASSATA RÚSTICA SALSARETTI 300G" vira "Passata Rústica Salsaretti 300g".
 // Nomes que já contêm minúsculas são mantidos como estão.
@@ -74,14 +87,15 @@ export function readableProductName(name: string) {
   );
   if (!hasUppercaseLetter || hasLowercaseLetter) return trimmed;
 
-  const words = trimmed.toLowerCase().split(/\s+/);
-  return words
-    .map((word, index) => {
-      if (MEASURE_UNIT.test(word)) return word;
-      if (index > 0 && SMALL_WORDS.has(word)) return word;
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(" ");
+  return titleCaseWords(trimmed);
+}
+
+// Garante que cada palavra da descrição comece com maiúscula, por exemplo
+// "hemmer ketchup tradicional heinz 1 kg" vira "Hemmer Ketchup Tradicional Heinz 1 kg".
+export function capitalizeProductName(name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return trimmed;
+  return titleCaseWords(trimmed);
 }
 
 export function validBarcode(code: string) {

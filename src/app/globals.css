@@ -70,6 +70,11 @@ html[data-accent="orange"] {
   --accent-light: rgba(255, 112, 28, 0.1);
   --accent-rgb: 255, 112, 28;
 }
+html[data-accent="gray"] {
+  --accent: #8e8e93;
+  --accent-light: rgba(142, 142, 147, 0.1);
+  --accent-rgb: 142, 142, 147;
+}
 
 .dark {
   --bg: #0c0c0e;
@@ -97,6 +102,9 @@ html[data-accent="purple"].dark {
 }
 html[data-accent="orange"].dark {
   --accent-light: rgba(255, 112, 28, 0.18);
+}
+html[data-accent="gray"].dark {
+  --accent-light: rgba(142, 142, 147, 0.18);
 }
 
 *,
@@ -324,9 +332,11 @@ select {
 }
 .saldo-mes-title {
   color: var(--text);
-  font-size: 1.05rem;
-  font-weight: 400;
-  letter-spacing: -0.3px;
+  font-family: var(--font-manrope), "Inter", -apple-system, BlinkMacSystemFont,
+    sans-serif;
+  font-size: 1.0375rem;
+  font-weight: 800;
+  letter-spacing: -0.4px;
   margin-bottom: 2px;
 }
 .saldo-mes-account {
@@ -375,7 +385,6 @@ select {
   transition: all 0.15s ease;
 }
 .saldo-mes-action:hover:not(:disabled) {
-  background: var(--bg);
   color: var(--text2);
   opacity: 1;
 }
@@ -467,6 +476,14 @@ select {
   overflow: visible;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+.dashboard-panel-grid > .dashboard-transactions-widget {
+  height: auto;
+  align-self: start;
+  overflow: visible;
+}
+.dashboard-transactions-widget .tx-list {
+  overflow-y: visible;
 }
 .tx-meta {
   font-size: 0.75rem;
@@ -704,7 +721,7 @@ select {
 }
 /* ─── SECTION HEADER ────────────────── */
 .sec-title {
-  font-size: 1.4rem;
+  font-size: 1.3375rem;
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.4px;
@@ -2325,7 +2342,7 @@ input:checked + .toggle-slider:before {
 
 @media (max-width: 480px) {
   .sec-title {
-    font-size: 1.2rem;
+    font-size: 1.1375rem;
   }
 
   .month-nav {

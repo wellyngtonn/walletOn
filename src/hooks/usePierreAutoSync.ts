@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { refreshPierreData } from "@/services/pierre-sync";
+import { syncPierreData } from "@/services/pierre-sync";
 
 const PIERRE_SYNC_EVENT = "wallet-pierre-sync-complete";
 const PIERRE_SYNC_STORAGE = "wallet-pierre-sync-complete";
+const MIN_RESUME_SYNC_INTERVAL_MS = 60_000;
 
 export function markPierreSyncComplete() {
   if (typeof window === "undefined") return;
@@ -39,19 +40,42 @@ export function usePierreAutoSync({
   profileLoading: boolean;
 }) {
   const startedForUid = useRef<string | null>(null);
+  const syncing = useRef(false);
+  const lastSyncAt = useRef(0);
 
   useEffect(() => {
-    if (
-      !uid ||
-      !hasApiKey ||
-      profileLoading ||
-      startedForUid.current === uid
-    ) return;
-    startedForUid.current = uid;
-    void refreshPierreData(preferredAccountId)
-      .then(() => markPierreSyncComplete())
-      .catch(() => {
-        // A falha silenciosa evita bloquear a abertura do app.
-      });
+    if (!uid || !hasApiKey || profileLoading) return;
+
+    const runSync = () => {
+      if (syncing.current) return;
+      syncing.current = true;
+      lastSyncAt.current = Date.now();
+      void syncPierreData(preferredAccountId)
+        .then(() => markPierreSyncComplete())
+        .catch(() => {
+          // A falha silenciosa evita bloquear a abertura do app.
+        })
+        .finally(() => {
+          syncing.current = false;
+        });
+    };
+
+    if (startedForUid.current !== uid) {
+      startedForUid.current = uid;
+      runSync();
+    }
+
+    const handleResume = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (Date.now() - lastSyncAt.current < MIN_RESUME_SYNC_INTERVAL_MS) return;
+      runSync();
+    };
+
+    document.addEventListener("visibilitychange", handleResume);
+    window.addEventListener("focus", handleResume);
+    return () => {
+      document.removeEventListener("visibilitychange", handleResume);
+      window.removeEventListener("focus", handleResume);
+    };
   }, [hasApiKey, preferredAccountId, profileLoading, uid]);
 }

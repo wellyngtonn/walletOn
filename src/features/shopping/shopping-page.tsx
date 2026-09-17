@@ -19,7 +19,7 @@ import type {
 } from "@/types";
 import { currency, dateBR } from "@/utils/format";
 import { INITIAL_SHOPPING_HISTORY } from "@/features/shopping/historical-data";
-import { readableProductName, validBarcode } from "@/utils/shopping-product";
+import { capitalizeProductName, readableProductName, validBarcode } from "@/utils/shopping-product";
 import { lookupBarcode } from "@/services/barcode";
 
 type ShopTab = "ativa" | "historico";
@@ -416,7 +416,7 @@ export function ShoppingPage() {
   function historyText(record: ShoppingHistory) {
     const lines = [...record.items]
       .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
-      .map((item) => `${item.qty}x ${readableProductName(item.name)}${item.price ? ` — ${currency(item.price)} cada` : ""}`);
+      .map((item) => `${item.qty}x ${capitalizeProductName(item.name)}${item.price ? ` — ${currency(item.price)} cada` : ""}`);
 
     return [...(record.title ? [`*${record.title}*`] : []), `*${record.date ? dateBR(record.date) : "Sem data"}*`, `*${currency(record.total)}*`, ...lines].join("\n");
   }
@@ -494,7 +494,7 @@ export function ShoppingPage() {
   return (
     <section className="shopping-page">
       <div className="sec-header shopping-header">
-        <h2 className="sec-title">Lista de Compras</h2>
+        <h2 className="sec-title">Compras</h2>
       </div>
 
       <div className="shop-tabs" role="tablist" aria-label="Lista de compras">
@@ -593,7 +593,7 @@ export function ShoppingPage() {
                     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
                     .map((item, index) => (
                       <li className="shop-historico-line" key={`${item.name}-${index}`}>
-                        <span>{item.qty}x {readableProductName(item.name)}</span>
+                        <span>{item.qty}x {capitalizeProductName(item.name)}</span>
                         {item.price ? (
                           <span className="shop-historico-line-price">
                             {currency(item.price)} cada

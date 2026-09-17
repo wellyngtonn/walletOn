@@ -20,7 +20,7 @@ export type TransactionInput = Omit<
   Transaction,
   "id" | "userId" | "createdAt" | "updatedAt"
 >;
-export type AccentColor = "blue" | "green" | "purple" | "orange";
+export type AccentColor = "blue" | "green" | "purple" | "orange" | "gray";
 
 export type PlanType = "income" | "expense";
 export type RecurrencePeriod = "monthly" | "quarterly" | "yearly";

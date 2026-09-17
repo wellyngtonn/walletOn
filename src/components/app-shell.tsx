@@ -91,7 +91,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         pathname === "/planejamento" ||
         pathname === "/analise/" ||
         pathname === "/planejamento/" ? (
-          <header className="mb-5 flex items-center justify-end">
+          <header className="mb-5 flex items-center justify-end md:pr-[64px]">
             <div className="flex items-center gap-2">
               <MonthPicker
                 month={month}

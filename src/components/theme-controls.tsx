@@ -6,8 +6,8 @@ import type { AccentColor } from "@/types";
 const colors: { name: AccentColor; hex: string }[] = [
   { name: "blue", hex: "#2979ff" },
   { name: "green", hex: "#15b985" },
-  { name: "purple", hex: "#a64ce6" },
   { name: "orange", hex: "#ff701c" },
+  { name: "gray", hex: "#8e8e93" },
 ];
 
 export function ThemeControls() {
