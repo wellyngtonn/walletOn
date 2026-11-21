@@ -13,31 +13,13 @@ import {
 import { TransactionList } from "@/components/transaction-list";
 import type { Transaction } from "@/types";
 import { currency } from "@/utils/format";
-import { filterPierreMovements } from "@/utils/pierre";
+import { CATEGORY_META, DEFAULT_CATEGORY_META } from "@/utils/categories";
+import { filterImportedMovements } from "@/utils/bank";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
-
-const CATEGORY_META: Record<string, { icon: string; color: string }> = {
-  Alimentação: { icon: "🍱", color: "#ff6b35" },
-  Transporte: { icon: "🚗", color: "#2979ff" },
-  Saúde: { icon: "💊", color: "#f44336" },
-  Educação: { icon: "📚", color: "#7b1fa2" },
-  Lazer: { icon: "🎮", color: "#ab47bc" },
-  Moradia: { icon: "🏠", color: "#388e3c" },
-  Salário: { icon: "💼", color: "#00c853" },
-  Investimento: { icon: "📈", color: "#00b0ff" },
-  Vestuário: { icon: "👗", color: "#e91e63" },
-  Pets: { icon: "🐾", color: "#ff8f00" },
-  Beleza: { icon: "💅", color: "#f06292" },
-  Compras: { icon: "🛍️", color: "#ffd600" },
-  Contas: { icon: "📄", color: "#546e7a" },
-  Assinaturas: { icon: "📱", color: "#3949ab" },
-  Transferências: { icon: "↔️", color: "#607d8b" },
-  Outros: { icon: "📊", color: "#8e8e93" },
-};
 
 function categoryOf(transaction: Transaction) {
   return transaction.category || "Outros";
@@ -62,14 +44,14 @@ export function MonthlyAnalysis({
   allItems,
   month,
   year,
-  pierreAccountId,
+  accountId,
   onEdit,
 }: {
   items: Transaction[];
   allItems: Transaction[];
   month: number;
   year: number;
-  pierreAccountId: string | null;
+  accountId: string | null;
   onEdit: (transaction: Transaction) => void;
 }) {
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
@@ -77,12 +59,12 @@ export function MonthlyAnalysis({
   const [search, setSearch] = useState("");
 
   const pierreItems = useMemo(
-    () => filterPierreMovements(items, pierreAccountId),
-    [items, pierreAccountId],
+    () => filterImportedMovements(items, accountId),
+    [items, accountId],
   );
   const pierreAllItems = useMemo(
-    () => filterPierreMovements(allItems, pierreAccountId),
-    [allItems, pierreAccountId],
+    () => filterImportedMovements(allItems, accountId),
+    [allItems, accountId],
   );
   const monthItems = useMemo(
     () => monthTransactions(pierreItems, month, year),
@@ -128,7 +110,7 @@ export function MonthlyAnalysis({
         category,
         value,
         percentage: total ? (value / total) * 100 : 0,
-        meta: CATEGORY_META[category] || CATEGORY_META.Outros,
+        meta: CATEGORY_META[category] || DEFAULT_CATEGORY_META,
       }));
   }, [pierreMonth]);
 

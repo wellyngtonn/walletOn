@@ -1,95 +1,176 @@
-import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import {
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
-import { selectDefaultPierreAccount } from "@/utils/pierre";
+import {
+  selectDefaultAccount,
+  type BankAccountSummary,
+  type BankProvider,
+} from "@/utils/bank";
 
 const profilePath = (uid: string) => doc(db, "users", uid);
 
-export interface PierreAccountProfile {
-  id: string;
-  name: string;
-  balance: number;
-}
+export type BankAccountProfile = BankAccountSummary;
 
-export interface PierreProfile {
+export interface BankProfile {
+  provider: BankProvider | null;
+  connected: boolean;
+  pierreConnected: boolean;
+  pluggyConnected: boolean;
   balance: number | null;
   accountId: string | null;
   accountName: string | null;
-  accounts: PierreAccountProfile[];
-  hasApiKey: boolean;
+  accounts: BankAccountProfile[];
+  itemId: string | null;
+  itemStatus: string | null;
+  connectorName: string | null;
 }
 
-export function subscribePierreProfile(
+function accountsFrom(value: unknown): BankAccountProfile[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (account): account is Record<string, unknown> =>
+        Boolean(account) && typeof account === "object",
+    )
+    .map((account) => ({
+      id: typeof account.id === "string" ? account.id : "",
+      name: typeof account.name === "string" ? account.name : "",
+      balance:
+        typeof account.balance === "number" && Number.isFinite(account.balance)
+          ? account.balance
+          : 0,
+      ...(typeof account.type === "string" ? { type: account.type } : {}),
+      ...(typeof account.subtype === "string"
+        ? { subtype: account.subtype }
+        : {}),
+    }))
+    .filter((account) => account.id && account.name);
+}
+
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
+
+export function subscribeBankProfile(
   uid: string,
-  onData: (profile: PierreProfile) => void,
+  onData: (profile: BankProfile) => void,
   onError: (error: Error) => void,
 ) {
   return onSnapshot(
     profilePath(uid),
     (snapshot) => {
       const data = snapshot.data() || {};
-      const legacyConfig =
-        data.cfg && typeof data.cfg === "object"
-          ? (data.cfg as Record<string, unknown>)
-          : {};
-      const rawAccounts = Array.isArray(data.pierreAccounts)
-        ? data.pierreAccounts
-        : Array.isArray(legacyConfig.pierreAccounts)
-          ? legacyConfig.pierreAccounts
-          : [];
-      const accounts = rawAccounts.filter(
-            (account): account is PierreAccountProfile =>
-              Boolean(account) &&
-              typeof account.id === "string" &&
-              typeof account.name === "string" &&
-              typeof account.balance === "number",
-          );
+      const legacyConfig = objectValue(data.cfg);
+
+      const pierreAccounts = accountsFrom(
+        Array.isArray(data.pierreAccounts)
+          ? data.pierreAccounts
+          : legacyConfig.pierreAccounts,
+      );
+      const pluggyAccounts = accountsFrom(data.pluggyAccounts);
+
+      const pierreConnected =
+        data.pierreApiKeyConfigured === true ||
+        (typeof data.pierreApiKey === "string" && data.pierreApiKey.length > 0) ||
+        (typeof legacyConfig.pierreKey === "string" &&
+          legacyConfig.pierreKey.length > 0);
+      const pluggyConnected =
+        data.pluggyConnected === true || Boolean(stringValue(data.pluggyItemId));
+
+      let provider: BankProvider | null = null;
+      if (data.bankProvider === "pluggy" && pluggyConnected) provider = "pluggy";
+      else if (data.bankProvider === "pierre" && pierreConnected) provider = "pierre";
+      else if (pluggyConnected) provider = "pluggy";
+      else if (pierreConnected) provider = "pierre";
+
+      if (!provider) {
+        onData({
+          provider: null,
+          connected: false,
+          pierreConnected,
+          pluggyConnected,
+          balance: null,
+          accountId: null,
+          accountName: null,
+          accounts: [],
+          itemId: null,
+          itemStatus: null,
+          connectorName: null,
+        });
+        return;
+      }
+
+      const accounts = provider === "pluggy" ? pluggyAccounts : pierreAccounts;
       const configuredAccountId =
-        typeof data.pierreAccountId === "string"
-          ? data.pierreAccountId
-          : typeof legacyConfig.pierreAccountId === "string"
-            ? legacyConfig.pierreAccountId
-            : null;
+        provider === "pluggy"
+          ? stringValue(data.pluggyAccountId)
+          : stringValue(data.pierreAccountId) ||
+            stringValue(legacyConfig.pierreAccountId);
+      const configuredBalance =
+        provider === "pluggy"
+          ? typeof data.pluggyBalance === "number"
+            ? data.pluggyBalance
+            : null
+          : typeof data.pierreBalance === "number"
+            ? data.pierreBalance
+            : typeof legacyConfig.pierreTotalBalance === "number"
+              ? legacyConfig.pierreTotalBalance
+              : null;
       const selectedAccount =
         accounts.find((account) => account.id === configuredAccountId) ||
-        selectDefaultPierreAccount(accounts);
-      const configuredBalance =
-        typeof data.pierreBalance === "number"
-          ? data.pierreBalance
-          : typeof legacyConfig.pierreTotalBalance === "number"
-            ? legacyConfig.pierreTotalBalance
-            : null;
+        selectDefaultAccount(accounts);
+      const configuredName =
+        provider === "pluggy"
+          ? stringValue(data.pluggyAccountName)
+          : stringValue(data.pierreAccountName);
+
       onData({
-        balance:
-          selectedAccount?.balance ?? configuredBalance,
+        provider,
+        connected: true,
+        pierreConnected,
+        pluggyConnected,
+        balance: selectedAccount?.balance ?? configuredBalance,
         accountId: selectedAccount?.id ?? configuredAccountId,
-        accountName:
-          typeof data.pierreAccountName === "string"
-            ? data.pierreAccountName
-            : selectedAccount?.name || null,
+        accountName: selectedAccount?.name ?? configuredName,
         accounts,
-        hasApiKey:
-          data.pierreApiKeyConfigured === true ||
-          (typeof data.pierreApiKey === "string" && data.pierreApiKey.length > 0) ||
-          (typeof legacyConfig.pierreKey === "string" && legacyConfig.pierreKey.length > 0),
+        itemId:
+          provider === "pluggy" ? stringValue(data.pluggyItemId) : null,
+        itemStatus:
+          provider === "pluggy" ? stringValue(data.pluggyItemStatus) : null,
+        connectorName:
+          provider === "pluggy"
+            ? stringValue(data.pluggyConnectorName)
+            : null,
       });
     },
     onError,
   );
 }
 
-export function savePierreAccounts(
+export function saveAccountSelection(
   uid: string,
-  accounts: PierreAccountProfile[],
-  selectedAccount: PierreAccountProfile,
+  provider: BankProvider,
+  account: BankAccountProfile,
 ) {
+  const prefix = provider === "pluggy" ? "pluggy" : "pierre";
   return setDoc(
     profilePath(uid),
     {
-      pierreAccounts: accounts,
-      pierreAccountId: selectedAccount.id,
-      pierreAccountName: selectedAccount.name,
-      pierreBalance: selectedAccount.balance,
-      pierreBalanceUpdatedAt: serverTimestamp(),
+      bankProvider: provider,
+      [`${prefix}AccountId`]: account.id,
+      [`${prefix}AccountName`]: account.name,
+      [`${prefix}Balance`]: account.balance,
+      [`${prefix}BalanceUpdatedAt`]: serverTimestamp(),
     },
     { merge: true },
   );
@@ -97,16 +178,14 @@ export function savePierreAccounts(
 
 export function savePierreAccountSelection(
   uid: string,
-  account: PierreAccountProfile,
+  account: BankAccountProfile,
 ) {
-  return setDoc(
-    profilePath(uid),
-    {
-      pierreAccountId: account.id,
-      pierreAccountName: account.name,
-      pierreBalance: account.balance,
-      pierreBalanceUpdatedAt: serverTimestamp(),
-    },
-    { merge: true },
-  );
+  return saveAccountSelection(uid, "pierre", account);
+}
+
+export function savePluggyAccountSelection(
+  uid: string,
+  account: BankAccountProfile,
+) {
+  return saveAccountSelection(uid, "pluggy", account);
 }

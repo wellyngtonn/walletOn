@@ -3,9 +3,9 @@
 import { FileDown, Share2 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { listPierreTransactions } from "@/services/transactions";
-import { usePierreBalance } from "@/hooks/usePierreBalance";
-import { filterPierreMovements } from "@/utils/pierre";
+import { listAccountTransactions } from "@/services/transactions";
+import { useBankProfile } from "@/hooks/useBankProfile";
+import { filterImportedMovements } from "@/utils/bank";
 import {
   filterStatementTransactions,
   isValidStatementPeriod,
@@ -46,8 +46,8 @@ export function StatementExport({
   const {
     accountId,
     accountName,
-    loading: pierreLoading,
-  } = usePierreBalance(user?.uid);
+    loading: bankLoading,
+  } = useBankProfile(user?.uid);
   const now = new Date();
   const currentYear = now.getFullYear();
   const [period, setPeriod] = useState<StatementPeriod>({
@@ -76,15 +76,15 @@ export function StatementExport({
 
   async function getItems() {
     if (!user) throw new Error("Usuário não autenticado.");
-    if (pierreLoading) throw new Error("A carteira Pierre ainda está carregando.");
-    if (!accountId) throw new Error("Nenhuma carteira Pierre foi selecionada.");
+    if (bankLoading) throw new Error("A carteira ainda está carregando.");
+    if (!accountId) throw new Error("Nenhuma carteira foi selecionada.");
     if (!isValidStatementPeriod(period)) {
       throw new Error("O período inicial deve ser anterior ao período final.");
     }
 
     const { fromDate, toDate } = statementPeriodBounds(period);
-    const pierreItems = await listPierreTransactions(user.uid, accountId, fromDate, toDate);
-    return filterStatementTransactions(filterPierreMovements(pierreItems, accountId), period);
+    const accountItems = await listAccountTransactions(user.uid, accountId, fromDate, toDate);
+    return filterStatementTransactions(filterImportedMovements(accountItems, accountId), period);
   }
 
   async function exportPdf() {
@@ -93,12 +93,12 @@ export function StatementExport({
       onStatus("Usuário não autenticado.");
       return;
     }
-    if (pierreLoading) {
-      onStatus("Aguarde o carregamento da carteira Pierre.");
+    if (bankLoading) {
+      onStatus("Aguarde o carregamento da carteira.");
       return;
     }
     if (!accountId) {
-      onStatus("Nenhuma carteira Pierre foi selecionada.");
+      onStatus("Nenhuma carteira foi selecionada.");
       return;
     }
     if (!isValidStatementPeriod(period)) {
@@ -126,8 +126,8 @@ export function StatementExport({
       onStatus("Usuário não autenticado.");
       return;
     }
-    if (pierreLoading || !accountId) {
-      onStatus("Aguarde a seleção de uma carteira Pierre.");
+    if (bankLoading || !accountId) {
+      onStatus("Aguarde a seleção de uma carteira.");
       return;
     }
     if (!isValidStatementPeriod(period)) {
@@ -145,8 +145,8 @@ export function StatementExport({
 
       if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
         await navigator.share({
-          title: "Extrato financeiro Pierre",
-          text: `Extrato Pierre - ${accountName || "Carteira"}`,
+          title: "Extrato financeiro",
+          text: `Extrato - ${accountName || "Carteira"}`,
           files: [file],
         });
         onStatus("PDF compartilhado com sucesso.");
@@ -165,15 +165,15 @@ export function StatementExport({
     }
   }
 
-  const accountLabel = pierreLoading
+  const accountLabel = bankLoading
     ? "Carregando carteira..."
     : accountName || "Nenhuma carteira selecionada";
 
   return (
     <div className={`statement-export-card ${embedded ? "statement-export-embedded" : ""}`}>
-      <h4 className="statement-export-title">Exportar Extrato Pierre</h4>
+      <h4 className="statement-export-title">Exportar Extrato</h4>
       <p className="statement-export-desc">
-        Gere um arquivo PDF com as movimentações financeiras importadas do Pierre.
+        Gere um arquivo PDF com as movimentações financeiras importadas da sua conta.
         <span className="statement-export-account">Carteira: <strong>{accountLabel}</strong></span>
       </p>
       <span className="statement-export-label">PERÍODO</span>

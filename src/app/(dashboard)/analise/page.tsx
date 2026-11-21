@@ -5,7 +5,7 @@ import { useAllTransactions } from "@/hooks/useAllTransactions";
 import { MonthlyAnalysis } from "@/features/analysis/monthly-analysis";
 
 export default function Page() {
-  const { month, year, pierreAccountId, openEdit } = useDashboard();
+  const { month, year, accountId, openEdit } = useDashboard();
   const { transactions, loading, error } = useAllTransactions();
 
   if (loading) return <p className="text-[var(--text3)]">Carregando análise...</p>;
@@ -17,7 +17,7 @@ export default function Page() {
       allItems={transactions}
       month={month}
       year={year}
-      pierreAccountId={pierreAccountId}
+      accountId={accountId}
       onEdit={openEdit}
     />
   );

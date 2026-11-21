@@ -1,28 +1,40 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Barcode, Camera, Check, Copy, Pencil, ScanLine, X } from "lucide-react";
+import { Barcode, Camera, Check, Copy, Pencil, ScanLine, ScanText, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import {
   archiveShoppingItems,
   createShoppingItem,
+  createShoppingItemsBatch,
   deleteShoppingItem,
   ensureShoppingHistory,
-  updateShoppingItem,
+  finalizeShoppingItems,
+  updateShoppingHistoryPhoto,
   updateShoppingHistoryTitle,
+  updateShoppingItem,
 } from "@/services/shopping";
+import { deleteReceiptPhoto } from "@/services/receipt";
+import { runReceiptOcr } from "@/services/receipt-ocr";
 import type {
   ShoppingHistory,
   ShoppingItem,
   ShoppingItemInput,
 } from "@/types";
-import { currency, dateBR } from "@/utils/format";
+import { currency, dateBR, todayISO } from "@/utils/format";
+import { friendlyError } from "@/utils/errors";
 import { INITIAL_SHOPPING_HISTORY } from "@/features/shopping/historical-data";
 import { capitalizeProductName, readableProductName, validBarcode } from "@/utils/shopping-product";
 import { lookupBarcode } from "@/services/barcode";
 
 type ShopTab = "ativa" | "historico";
+
+type OcrDraft = {
+  name: string;
+  qty: number;
+  price: string;
+};
 
 type BarcodeDetection = { rawValue?: string };
 type BarcodeDetectorLike = {
@@ -33,10 +45,6 @@ type BarcodeDetectorConstructor = new (options?: {
 }) => BarcodeDetectorLike;
 
 const BARCODE_FORMATS = ["ean_13", "ean_8", "upc_a", "upc_e"];
-
-function todayString() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function priceValue(value: string) {
   const text = value.trim();
@@ -67,6 +75,7 @@ export function ShoppingPage() {
   const [price, setPrice] = useState("");
   const [addingItem, setAddingItem] = useState(false);
   const addingItemRef = useRef(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [actionError, setActionError] = useState("");
   const [copiedHistoryId, setCopiedHistoryId] = useState<string | null>(null);
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
@@ -74,6 +83,15 @@ export function ShoppingPage() {
   const [editingTitleDate, setEditingTitleDate] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [savingTitle, setSavingTitle] = useState(false);
+  const [uploadingPhotoId, setUploadingPhotoId] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const [ocrOpen, setOcrOpen] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [ocrItems, setOcrItems] = useState<OcrDraft[]>([]);
+  const [ocrRawText, setOcrRawText] = useState("");
+  const [ocrError, setOcrError] = useState("");
+  const [ocrSaving, setOcrSaving] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scannerError, setScannerError] = useState("");
   const nameRef = useRef<HTMLInputElement>(null);
@@ -86,10 +104,21 @@ export function ShoppingPage() {
   const lookupControllerRef = useRef<AbortController | null>(null);
   const lookupRequestRef = useRef(0);
   const barcodeCacheRef = useRef<Map<string, string | null>>(new Map());
+  const ocrCaptureRef = useRef<HTMLInputElement>(null);
+  const ocrFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => () => {
     if (copyFeedbackTimer.current) window.clearTimeout(copyFeedbackTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!viewingPhoto) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setViewingPhoto(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [viewingPhoto]);
 
   const releaseScanner = useCallback(() => {
     if (scannerTimerRef.current !== null) {
@@ -123,6 +152,18 @@ export function ShoppingPage() {
     [items],
   );
   const completedItems = useMemo(() => items.filter((item) => item.done), [items]);
+  const localBarcodeNames = useMemo(() => {
+    const map = new Map<string, string>();
+    items.forEach((item) => {
+      if (item.barcode && !map.has(item.barcode)) map.set(item.barcode, item.name);
+    });
+    savedHistory.forEach((record) => {
+      record.items.forEach((item) => {
+        if (item.barcode && !map.has(item.barcode)) map.set(item.barcode, item.name);
+      });
+    });
+    return map;
+  }, [items, savedHistory]);
   const total = activeItems.reduce((sum, item) => sum + item.qty * item.price, 0);
   const history = useMemo<ShoppingHistory[]>(() => {
     const records = new Map<string, ShoppingHistory>();
@@ -144,7 +185,7 @@ export function ShoppingPage() {
 
     const groups = new Map<string, ShoppingItem[]>();
     completedItems.forEach((item) => {
-      const key = item.completedDate || todayString();
+      const key = item.completedDate || todayISO();
       groups.set(key, [...(groups.get(key) || []), item]);
     });
     groups.forEach((groupedItems, date) => {
@@ -167,7 +208,7 @@ export function ShoppingPage() {
   useEffect(() => {
     if (!user) return;
     void ensureShoppingHistory(user.uid, INITIAL_SHOPPING_HISTORY).catch((exception) => {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar o histórico.");
+      setActionError(friendlyError(exception, "Não foi possível salvar o histórico."));
     });
   }, [user]);
 
@@ -178,6 +219,16 @@ export function ShoppingPage() {
     lookupControllerRef.current?.abort();
     const requestId = ++lookupRequestRef.current;
     setBarcodeNotice("");
+
+    const localName = localBarcodeNames.get(code);
+    if (localName) {
+      barcodeCacheRef.current.set(code, localName);
+      setName(localName);
+      setBarcodeStatus("ok");
+      setBarcodeNotice("Encontrado nas suas compras.");
+      nameRef.current?.focus();
+      return;
+    }
 
     const cachedName = barcodeCacheRef.current.get(code);
     if (cachedName !== undefined) {
@@ -213,7 +264,7 @@ export function ShoppingPage() {
         setBarcodeNotice("Não foi possível consultar o produto. Tente novamente ou digite o nome.");
       }
     }
-  }, []);
+  }, [localBarcodeNames]);
 
   useEffect(() => {
     lookupControllerRef.current?.abort();
@@ -351,15 +402,17 @@ export function ShoppingPage() {
     addingItemRef.current = true;
     setAddingItem(true);
     const nextOrder = items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+    const itemBarcode = barcode.replace(/\D/g, "");
     try {
       await createShoppingItem(user.uid, {
         name: name.trim(),
         qty: Math.max(1, Math.trunc(Number(qty) || 1)),
         price: parsedPrice,
         done: false,
-        createdDate: todayString(),
+        createdDate: todayISO(),
         completedDate: null,
         order: nextOrder,
+        ...(validBarcode(itemBarcode) ? { barcode: itemBarcode } : {}),
       });
       setBarcode("");
       setName("");
@@ -367,7 +420,7 @@ export function ShoppingPage() {
       setPrice("");
       nameRef.current?.focus();
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível adicionar o item.");
+      setActionError(friendlyError(exception, "Não foi possível adicionar o item."));
     } finally {
       addingItemRef.current = false;
       setAddingItem(false);
@@ -397,10 +450,10 @@ export function ShoppingPage() {
     try {
       await updateShoppingItem(user.uid, item.id, itemInput(item, {
         done: !item.done,
-        completedDate: !item.done ? todayString() : null,
+        completedDate: !item.done ? todayISO() : null,
       }));
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar o item.");
+      setActionError(friendlyError(exception, "Não foi possível atualizar o item."));
     }
   }
 
@@ -409,7 +462,21 @@ export function ShoppingPage() {
     try {
       await deleteShoppingItem(user.uid, item.id);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir o item.");
+      setActionError(friendlyError(exception, "Não foi possível excluir o item."));
+    }
+  }
+
+  async function finalizeList() {
+    if (!user || finalizing || !activeItems.length) return;
+    if (!confirm("Finalizar a lista e mover todos os itens para o histórico?")) return;
+    setFinalizing(true);
+    setActionError("");
+    try {
+      await finalizeShoppingItems(user.uid);
+    } catch (exception) {
+      setActionError(friendlyError(exception, "Não foi possível finalizar a lista."));
+    } finally {
+      setFinalizing(false);
     }
   }
 
@@ -421,24 +488,117 @@ export function ShoppingPage() {
     return [...(record.title ? [`*${record.title}*`] : []), `*${record.date ? dateBR(record.date) : "Sem data"}*`, `*${currency(record.total)}*`, ...lines].join("\n");
   }
 
+  async function ensureHistoryId(record: ShoppingHistory) {
+    if (!user) throw new Error("Sessão expirada. Entre novamente.");
+    let id = record.id;
+    if (id.startsWith("pending-")) {
+      await archiveShoppingItems(user.uid, completedItems.filter((item) =>
+        (item.completedDate || todayISO()) === record.date,
+      ));
+      id = `shopping-history-${record.date}`;
+    }
+    return id;
+  }
+
   async function saveHistoryTitle(record: ShoppingHistory) {
     if (!user || savingTitle) return;
     setSavingTitle(true);
     setActionError("");
     try {
-      let id = record.id;
-      if (id.startsWith("pending-")) {
-        await archiveShoppingItems(user.uid, completedItems.filter((item) =>
-          (item.completedDate || todayString()) === record.date,
-        ));
-        id = `shopping-history-${record.date}`;
-      }
+      const id = await ensureHistoryId(record);
       await updateShoppingHistoryTitle(user.uid, id, editingTitle);
       setEditingTitleDate(null);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar o local da compra.");
+      setActionError(friendlyError(exception, "Não foi possível salvar o local da compra."));
     } finally {
       setSavingTitle(false);
+    }
+  }
+
+  function openOcr() {
+    setOcrError("");
+    setOcrStatus("idle");
+    setOcrProgress(0);
+    setOcrItems([]);
+    setOcrRawText("");
+    setOcrOpen(true);
+  }
+
+  async function handleOcrFile(file: File | undefined) {
+    if (!file) return;
+    setOcrError("");
+    setOcrStatus("loading");
+    setOcrProgress(0);
+    setOcrItems([]);
+    setOcrRawText("");
+    try {
+      const result = await runReceiptOcr(file, setOcrProgress);
+      setOcrItems(result.items.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        price: item.price ? String(item.price).replace(".", ",") : "",
+      })));
+      setOcrRawText(result.text);
+      setOcrStatus("done");
+      if (!result.items.length) {
+        setOcrError("Nenhum item identificado. Tente uma foto mais nítida ou ajuste o enquadramento.");
+      }
+    } catch (exception) {
+      setOcrError(friendlyError(exception, "Não foi possível ler o cupom."));
+      setOcrStatus("error");
+    }
+  }
+
+  function updateOcrItem(index: number, changes: Partial<OcrDraft>) {
+    setOcrItems((current) => current.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, ...changes } : item,
+    ));
+  }
+
+  async function addOcrItems() {
+    if (!user || ocrSaving) return;
+    const valid = ocrItems.filter((item) => item.name.trim() && (priceValue(item.price) ?? 0) > 0);
+    if (!valid.length) {
+      setOcrError("Ajuste os itens antes de adicionar.");
+      return;
+    }
+    setOcrError("");
+    setOcrSaving(true);
+    const baseOrder = items.reduce((max, item) => Math.max(max, item.order), -1);
+    try {
+      await createShoppingItemsBatch(user.uid, valid.map((item, index) => ({
+        data: {
+          name: item.name.trim(),
+          qty: Math.max(1, Math.trunc(item.qty || 1)),
+          price: priceValue(item.price) ?? 0,
+          done: false,
+          createdDate: todayISO(),
+          completedDate: null,
+          order: baseOrder + index + 1,
+        },
+      })));
+      setOcrOpen(false);
+      setOcrStatus("idle");
+      setOcrItems([]);
+    } catch (exception) {
+      setOcrError(friendlyError(exception, "Não foi possível adicionar os itens."));
+    } finally {
+      setOcrSaving(false);
+    }
+  }
+
+  async function removeReceiptPhoto(record: ShoppingHistory) {
+    if (!user || uploadingPhotoId) return;
+    setActionError("");
+    setUploadingPhotoId(record.id);
+    try {
+      const id = await ensureHistoryId(record);
+      await deleteReceiptPhoto(user.uid, id);
+      await updateShoppingHistoryPhoto(user.uid, id, "");
+    } catch (exception) {
+      setActionError(friendlyError(exception, "Não foi possível remover a foto do cupom."));
+    } finally {
+      setUploadingPhotoId(null);
     }
   }
 
@@ -484,7 +644,7 @@ export function ShoppingPage() {
       await updateShoppingItem(user.uid, item.id, itemInput(item, { price: parsedPrice }));
       setEditingPriceId(null);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar o preço.");
+      setActionError(friendlyError(exception, "Não foi possível salvar o preço."));
     }
   }
 
@@ -535,6 +695,13 @@ export function ShoppingPage() {
               <button className="btn-primary btn-sm" type="submit" disabled={addingItem}>{addingItem ? "Adicionando..." : "Adicionar"}</button>
             </form>
 
+            <div className="shop-ocr-row">
+              <button className="btn-outline btn-sm" type="button" onClick={openOcr}>
+                <ScanText size={14} aria-hidden="true" />
+                Ler cupom
+              </button>
+            </div>
+
             {actionError && <div className="msg-error mb-3">{actionError}</div>}
             {barcodeNotice && <p className="mb-3 text-sm text-[var(--text3)]" role="status">{barcodeNotice}</p>}
 
@@ -547,12 +714,20 @@ export function ShoppingPage() {
               {!activeItems.length ? <div className="tx-empty">Lista vazia. Adicione itens para começar!</div> : activeItems.map((item) => (
                 <div key={item.id} className="shop-item">
                   <button className="shop-check" type="button" onClick={() => void toggleItem(item)} aria-label={`Concluir ${item.name}`}>◯</button>
-                  <div className="shop-info"><span className="shop-name">📦 {readableProductName(item.name)}</span><div className="shop-qty-row"><span className="shop-qty">{item.qty}x</span>{editingPriceId === item.id ? <div className="shop-price-editor"><input autoFocus className="shop-price-input" type="number" min="0" step="0.01" value={editingPrice} onChange={(event) => setEditingPrice(event.target.value)} onBlur={(event) => { if (!(event.relatedTarget as HTMLElement | null)?.classList.contains("shop-price-action")) void savePrice(item); }} onKeyDown={(event) => { if (event.key === "Enter") void savePrice(item); if (event.key === "Escape") setEditingPriceId(null); }} /><button className="shop-price-action shop-price-action--ghost" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setEditingPriceId(null)} aria-label="Cancelar edição"><X size={13} /></button></div> : <button className="shop-price-btn" type="button" onClick={() => beginPriceEdit(item)}>{item.price > 0 ? currency(item.price) : "Definir preço"}</button>}</div></div>
+                  <div className="shop-info"><span className="shop-name">📦 {readableProductName(item.name)}</span><div className="shop-qty-row"><span className="shop-qty">{item.qty}x</span>{editingPriceId === item.id ? <div className="shop-price-editor"><input autoFocus className="shop-price-input" type="text" inputMode="decimal" value={editingPrice} onChange={(event) => setEditingPrice(event.target.value)} onBlur={(event) => { if (!(event.relatedTarget as HTMLElement | null)?.classList.contains("shop-price-action")) void savePrice(item); }} onKeyDown={(event) => { if (event.key === "Enter") void savePrice(item); if (event.key === "Escape") setEditingPriceId(null); }} /><button className="shop-price-action shop-price-action--ghost" type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setEditingPriceId(null)} aria-label="Cancelar edição"><X size={13} /></button></div> : <button className="shop-price-btn" type="button" onClick={() => beginPriceEdit(item)}>{item.price > 0 ? currency(item.price) : "Definir preço"}</button>}</div></div>
                   <span className="shop-total">{currency(item.qty * item.price)}</span>
                   <button className="tx-del" type="button" onClick={() => void removeItem(item)} aria-label={`Excluir ${item.name}`}>×</button>
                 </div>
               ))}
             </div>
+
+            {activeItems.length > 0 && (
+              <div className="shop-finalize-row">
+                <button className="btn-primary shop-finalize-btn" type="button" disabled={finalizing} onClick={() => void finalizeList()}>
+                  {finalizing ? "Finalizando..." : "Finalizar"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -568,10 +743,12 @@ export function ShoppingPage() {
                     <button className="btn-outline btn-sm" type="button" disabled={savingTitle} onClick={() => setEditingTitleDate(null)}>Cancelar</button>
                   </form>
                 ) : (
-                  <button className="shop-history-title" type="button" disabled={savingTitle} aria-label={`Editar local da compra de ${dateBR(record.date)}`} onClick={() => { setEditingTitleDate(record.date); setEditingTitle(record.title || ""); }}>
-                    <span>{record.title || "Adicionar local da compra"}</span>
-                    <Pencil size={14} aria-hidden="true" />
-                  </button>
+                  <div className="shop-history-title-row">
+                    <button className="shop-history-title" type="button" disabled={savingTitle} aria-label={`Editar local da compra de ${dateBR(record.date)}`} onClick={() => { setEditingTitleDate(record.date); setEditingTitle(record.title || ""); }}>
+                      <span>{record.title || "Adicionar local da compra"}</span>
+                      <Pencil size={14} aria-hidden="true" />
+                    </button>
+                  </div>
                 )}
                 <div className="shop-historico-header">
                   <div className="shop-historico-summary">
@@ -588,6 +765,29 @@ export function ShoppingPage() {
                     {copiedHistoryId === record.id ? "Copiado" : "Copiar"}
                   </button>
                 </div>
+                {record.photoUrl ? (
+                  <div className="shop-receipt">
+                    <button
+                      className="shop-receipt-thumb"
+                      type="button"
+                      onClick={() => setViewingPhoto(record.photoUrl!)}
+                      aria-label={`Ver foto do cupom de ${record.date ? dateBR(record.date) : "data não informada"}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={record.photoUrl} alt={`Cupom da compra de ${record.date ? dateBR(record.date) : "data não informada"}`} />
+                    </button>
+                    <span className="shop-receipt-caption">Cupom</span>
+                    <button
+                      className="tx-del"
+                      type="button"
+                      disabled={uploadingPhotoId === record.id}
+                      onClick={() => void removeReceiptPhoto(record)}
+                      aria-label="Remover foto do cupom"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
                 <ul className="shop-historico-items">
                   {[...record.items]
                     .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
@@ -627,6 +827,136 @@ export function ShoppingPage() {
               <span className="barcode-scanner-guide" aria-hidden="true" />
             </div>
             {scannerError ? <p className="msg-error barcode-scanner-error">{scannerError}</p> : <p className="barcode-scanner-hint">A leitura começa automaticamente.</p>}
+          </div>
+        </div>
+      )}
+
+      <input
+        ref={ocrCaptureRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: "none" }}
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void handleOcrFile(file);
+        }}
+      />
+      <input
+        ref={ocrFileRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          event.target.value = "";
+          if (file) void handleOcrFile(file);
+        }}
+      />
+
+      {ocrOpen && (
+        <div className="receipt-ocr-overlay" role="presentation">
+          <div className="receipt-ocr-modal" role="dialog" aria-modal="true" aria-labelledby="receipt-ocr-title">
+            <div className="receipt-ocr-header">
+              <div>
+                <h3 id="receipt-ocr-title" className="receipt-ocr-title">
+                  <ScanText size={17} aria-hidden="true" /> Ler cupom
+                </h3>
+                <p className="receipt-ocr-caption">Tire uma foto do cupom para extrair os itens.</p>
+              </div>
+              <button className="modal-close" type="button" onClick={() => setOcrOpen(false)} aria-label="Fechar leitor de cupom">
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            {ocrStatus === "idle" || ocrStatus === "error" ? (
+              <>
+                {ocrError && <p className="msg-error receipt-ocr-error" role="alert">{ocrError}</p>}
+                <div className="receipt-ocr-actions">
+                  <button className="btn-primary btn-sm" type="button" onClick={() => ocrCaptureRef.current?.click()}>
+                    <Camera size={14} aria-hidden="true" /> Tirar foto
+                  </button>
+                  <button className="btn-outline btn-sm" type="button" onClick={() => ocrFileRef.current?.click()}>
+                    Escolher imagem
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {ocrStatus === "loading" && (
+              <p className="receipt-ocr-progress" role="status">
+                Lendo o cupom... {Math.round(ocrProgress * 100)}%
+              </p>
+            )}
+
+            {ocrStatus === "done" && (
+              <>
+                {ocrItems.length ? (
+                  <div className="receipt-ocr-items">
+                    {ocrItems.map((item, index) => (
+                      <div className="receipt-ocr-item" key={index}>
+                        <input
+                          className="shop-input receipt-ocr-name"
+                          aria-label="Nome do item"
+                          value={item.name}
+                          onChange={(event) => updateOcrItem(index, { name: event.target.value })}
+                        />
+                        <input
+                          className="shop-input shop-input--sm"
+                          aria-label="Quantidade"
+                          type="number"
+                          min="1"
+                          value={item.qty}
+                          onChange={(event) => updateOcrItem(index, { qty: Math.trunc(Number(event.target.value) || 1) })}
+                        />
+                        <input
+                          className="shop-input shop-input--sm"
+                          aria-label="Preço"
+                          inputMode="decimal"
+                          value={String(item.price).replace(".", ",")}
+                          onChange={(event) => updateOcrItem(index, { price: event.target.value })}
+                        />
+                        <button className="tx-del" type="button" onClick={() => setOcrItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label="Remover item">
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {ocrError && <p className="msg-error receipt-ocr-error" role="alert">{ocrError}</p>}
+                {ocrRawText ? (
+                  <details className="receipt-ocr-raw">
+                    <summary>Ver texto lido</summary>
+                    <pre>{ocrRawText}</pre>
+                  </details>
+                ) : null}
+                <div className="receipt-ocr-actions">
+                  <button className="btn-primary btn-sm" type="button" disabled={!ocrItems.length || ocrSaving} onClick={() => void addOcrItems()}>
+                    {ocrSaving ? "Adicionando..." : `Adicionar ${ocrItems.length ? `${ocrItems.length} item${ocrItems.length > 1 ? "ns" : ""}` : "itens"}`}
+                  </button>
+                  <button className="btn-outline btn-sm" type="button" disabled={ocrSaving} onClick={() => ocrCaptureRef.current?.click()}>
+                    Nova foto
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {viewingPhoto && (
+        <div className="receipt-viewer-overlay" role="presentation" onClick={() => setViewingPhoto(null)}>
+          <div className="receipt-viewer-content" role="dialog" aria-modal="true" aria-label="Foto do cupom" onClick={(event) => event.stopPropagation()}>
+            <button className="receipt-viewer-close" type="button" onClick={() => setViewingPhoto(null)} aria-label="Fechar foto">
+              <X size={18} aria-hidden="true" />
+            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="receipt-viewer-image" src={viewingPhoto} alt="Foto do cupom" />
           </div>
         </div>
       )}

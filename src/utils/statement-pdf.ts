@@ -25,7 +25,7 @@ function periodToken(period: StatementPeriod) {
 }
 
 export function statementPdfFilename(period: StatementPeriod) {
-  return `wallet-on-extrato-pierre-${periodToken(period)}.pdf`;
+  return `wallet-on-extrato-${periodToken(period)}.pdf`;
 }
 
 function setTextColor(doc: jsPDF, color: [number, number, number]) {
@@ -40,7 +40,7 @@ function drawFooter(doc: jsPDF) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   setTextColor(doc, MUTED);
-  doc.text("WalletON - Extrato financeiro Pierre", MARGIN, PAGE_HEIGHT - 5);
+  doc.text("WalletON - Extrato financeiro", MARGIN, PAGE_HEIGHT - 5);
   doc.text(`Pagina ${page} de ${total}`, PAGE_WIDTH - MARGIN, PAGE_HEIGHT - 5, {
     align: "right",
   });
@@ -63,7 +63,7 @@ function drawPageHeader(
 
     setTextColor(doc, TEXT);
     doc.setFontSize(20);
-    doc.text("Extrato financeiro Pierre", MARGIN, 32);
+    doc.text("Extrato financeiro", MARGIN, 32);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     setTextColor(doc, MUTED);
@@ -85,7 +85,7 @@ function drawPageHeader(
   setTextColor(doc, ACCENT);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("WALLETON - EXTRATO PIERRE", MARGIN, 16);
+  doc.text("WALLETON - EXTRATO", MARGIN, 16);
   doc.setDrawColor(...ACCENT);
   doc.setLineWidth(0.6);
   doc.line(MARGIN, 20, PAGE_WIDTH - MARGIN, 20);

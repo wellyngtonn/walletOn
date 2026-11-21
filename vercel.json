@@ -2,6 +2,12 @@
   "functions": {
     "api/pierre.ts": {
       "maxDuration": 60
+    },
+    "api/pluggy.ts": {
+      "maxDuration": 60
+    },
+    "api/pluggy-webhook.ts": {
+      "maxDuration": 30
     }
   }
 }

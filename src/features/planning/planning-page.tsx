@@ -22,7 +22,9 @@ import type {
   RecurrencePeriod,
   PlannedTransactionInput,
 } from "@/types";
-import { currency, dateBR } from "@/utils/format";
+import { currency, dateBR, todayISO } from "@/utils/format";
+import { CATEGORY_LABELS } from "@/utils/categories";
+import { friendlyError } from "@/utils/errors";
 import {
   getDescriptionSuggestions,
   recurrenceDate,
@@ -32,13 +34,6 @@ import {
   recurrenceScheduled,
   recurrenceStarted,
 } from "@/utils/planning";
-
-const CATEGORIES = [
-  "Alimentação", "Assinaturas", "Beleza", "Combustível", "Compras",
-  "Contas", "Educação", "Farmácia", "Investimento", "Lazer", "Moradia",
-  "Pets", "Restaurantes", "Salário", "Saúde", "Serviços", "Supermercado",
-  "Transferências", "Transporte", "Vestuário", "Viagem", "Outros",
-];
 
 const emptyPlan = (date: string): PlannedTransactionInput => ({
   type: "expense",
@@ -59,10 +54,6 @@ const emptyRecurrence = (date: string): RecurrenceInput => ({
   period: "monthly",
   paid: false,
 });
-
-function todayString() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function periodLabel(period: RecurrencePeriod) {
   return period === "monthly" ? "Mensal" : period === "quarterly" ? "Trimestral" : "Anual";
@@ -195,8 +186,8 @@ export function PlanningPage() {
   const [modal, setModal] = useState<"plan" | "recurrence" | null>(null);
   const [editingPlan, setEditingPlan] = useState<PlannedTransaction | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState<Recurrence | null>(null);
-  const [planForm, setPlanForm] = useState<PlannedTransactionInput>(emptyPlan(todayString()));
-  const [recurrenceForm, setRecurrenceForm] = useState<RecurrenceInput>(emptyRecurrence(todayString()));
+  const [planForm, setPlanForm] = useState<PlannedTransactionInput>(emptyPlan(todayISO()));
+  const [recurrenceForm, setRecurrenceForm] = useState<RecurrenceInput>(emptyRecurrence(todayISO()));
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState("");
   const [descriptionFocused, setDescriptionFocused] = useState(false);
@@ -253,6 +244,11 @@ export function PlanningPage() {
     monthPlans.filter((plan) => plan.type === "expense").reduce((sum, plan) => sum + plan.amount, 0) +
     scheduledRecurrences
       .filter((recurrence) => recurrence.type === "expense")
+      .reduce((sum, recurrence) => sum + recurrence.amount, 0);
+  const pendingExpenses =
+    monthPlans.filter((plan) => plan.type === "expense" && !plan.paid).reduce((sum, plan) => sum + plan.amount, 0) +
+    scheduledRecurrences
+      .filter((recurrence) => recurrence.type === "expense" && !recurrencePaid(recurrence, year, month))
       .reduce((sum, recurrence) => sum + recurrence.amount, 0);
 
   useEffect(() => {
@@ -312,7 +308,7 @@ export function PlanningPage() {
             category: plan.category,
             paid: plan.paid || false,
           }
-        : emptyPlan(todayString()),
+        : emptyPlan(todayISO()),
     );
     setModal("plan");
   }
@@ -322,7 +318,7 @@ export function PlanningPage() {
     setDescriptionFocused(false);
     setEditingRecurrence(recurrence || null);
     if (!recurrence) {
-      setRecurrenceForm(emptyRecurrence(todayString()));
+      setRecurrenceForm(emptyRecurrence(todayISO()));
     } else {
       const form: RecurrenceInput = {
         type: recurrence.type,
@@ -358,7 +354,7 @@ export function PlanningPage() {
       else await createPlan(user.uid, data);
       setModal(null);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar.");
+      setActionError(friendlyError(exception, "Não foi possível salvar."));
     } finally {
       setSaving(false);
     }
@@ -384,7 +380,7 @@ export function PlanningPage() {
       else await createRecurrence(user.uid, data);
       setModal(null);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível salvar.");
+      setActionError(friendlyError(exception, "Não foi possível salvar."));
     } finally {
       setSaving(false);
     }
@@ -402,7 +398,7 @@ export function PlanningPage() {
         paid: !plan.paid,
       });
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar o lançamento.");
+      setActionError(friendlyError(exception, "Não foi possível atualizar o lançamento."));
     }
   }
 
@@ -426,7 +422,7 @@ export function PlanningPage() {
     try {
       await updateRecurrence(user.uid, recurrence.id, data);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível atualizar a recorrência.");
+      setActionError(friendlyError(exception, "Não foi possível atualizar a recorrência."));
     }
   }
 
@@ -435,7 +431,7 @@ export function PlanningPage() {
     try {
       await deletePlan(user.uid, plan.id);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir o lançamento.");
+      setActionError(friendlyError(exception, "Não foi possível excluir o lançamento."));
     }
   }
 
@@ -444,7 +440,7 @@ export function PlanningPage() {
     try {
       await deleteRecurrence(user.uid, recurrence.id);
     } catch (exception) {
-      setActionError(exception instanceof Error ? exception.message : "Não foi possível excluir a recorrência.");
+      setActionError(friendlyError(exception, "Não foi possível excluir a recorrência."));
     }
   }
 
@@ -474,6 +470,10 @@ export function PlanningPage() {
           <div className="plan-summary-metric plan-summary-balance">
             <span>Saldo Previsto</span>
             <strong>{currency(predictedIncome - predictedExpenses)}</strong>
+          </div>
+          <div className="plan-summary-metric plan-summary-expense">
+            <span>Pendente Saídas</span>
+            <strong>{currency(pendingExpenses)}</strong>
           </div>
         </div>
       </div>
@@ -604,7 +604,7 @@ export function PlanningPage() {
                 </>
               )}
               <select className="field" value={modal === "plan" ? planForm.category : recurrenceForm.category} onChange={(event) => modal === "plan" ? setPlanForm({ ...planForm, category: event.target.value }) : setRecurrenceForm({ ...recurrenceForm, category: event.target.value })}>
-                {CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+                {CATEGORY_LABELS.map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
               {actionError && <div className="msg-error">{actionError}</div>}
             </div>

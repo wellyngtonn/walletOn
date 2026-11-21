@@ -15,6 +15,8 @@ test("regras exigem propriedade do usuário e campos permitidos", () => {
 
 test("regras validam campos opcionais e limites básicos", () => {
   assert.match(rules, /pierreId.*is string/);
+  assert.match(rules, /externalId.*is string/);
+  assert.match(rules, /provider.*in \['pluggy','pierre'\]/);
   assert.match(rules, /paid.*is bool/);
   assert.match(rules, /limit.*is int/);
   assert.match(rules, /category\.size\(\) <= 60/);

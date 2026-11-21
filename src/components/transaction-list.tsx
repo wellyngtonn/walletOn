@@ -2,16 +2,11 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteTransaction } from "@/services/transactions";
-import type { Transaction, TransactionType } from "@/types";
-import { currency, dateBR } from "@/utils/format";
-import { pierreCategoryIcon } from "@/utils/pierre-category";
+import type { Transaction } from "@/types";
+import { currency, dateBR, typeLabels } from "@/utils/format";
+import { friendlyError } from "@/utils/errors";
+import { categoryIcon } from "@/utils/pierre-category";
 import { cleanTransactionName } from "@/utils/transaction-name";
-
-const labels: Record<TransactionType, string> = {
-  income: "Receita",
-  expense: "Despesa",
-  investment: "Investimento",
-};
 
 export function TransactionList({
   items,
@@ -30,7 +25,7 @@ export function TransactionList({
     try {
       await deleteTransaction(user.uid, id);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "Não foi possível excluir o lançamento.");
+      setError(friendlyError(exception, "Não foi possível excluir o lançamento."));
     }
   }
 
@@ -52,12 +47,12 @@ export function TransactionList({
             title={t.category || "Outros"}
             aria-label={`Categoria: ${t.category || "Outros"}`}
           >
-            {pierreCategoryIcon(t.category, t.description, t.type)}
+            {categoryIcon(t.category, t.description, t.type)}
           </div>
           <div className="tx-info">
             <p className="tx-desc">{cleanTransactionName(t.description)}</p>
             <p className="tx-meta">
-              {labels[t.type]} · {dateBR(t.date)}
+              {typeLabels[t.type]} · {dateBR(t.date)}
             </p>
           </div>
           <p className={`tx-val ${t.type === "income" ? "in" : "out"}`}>

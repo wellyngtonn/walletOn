@@ -44,12 +44,17 @@ function storedHistory(snapshotId: string, value: unknown): ShoppingHistory | nu
   }
 
   const items = record.items.filter(
-    (item): item is { name: string; qty: number; price?: number } =>
+    (item): item is { name: string; qty: number; price?: number; barcode?: string } =>
       Boolean(item) &&
       typeof item === "object" &&
       typeof (item as { name?: unknown }).name === "string" &&
       typeof (item as { qty?: unknown }).qty === "number",
-  );
+  ).map((item) => ({
+    name: item.name,
+    qty: item.qty,
+    ...(typeof item.price === "number" ? { price: item.price } : {}),
+    ...(typeof item.barcode === "string" && item.barcode ? { barcode: item.barcode } : {}),
+  }));
   return {
     id: snapshotId,
     userId: record.userId,
@@ -57,6 +62,9 @@ function storedHistory(snapshotId: string, value: unknown): ShoppingHistory | nu
     date: record.date,
     total: record.total,
     items,
+    ...(typeof record.photoUrl === "string" && record.photoUrl
+      ? { photoUrl: record.photoUrl }
+      : {}),
   };
 }
 
@@ -194,6 +202,7 @@ export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
           name: item.name,
           qty: item.qty,
           price: item.price,
+          ...(item.barcode ? { barcode: item.barcode } : {}),
         })),
       ];
       const total =
@@ -228,6 +237,65 @@ export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
   return items.length;
 }
 
+export async function finalizeShoppingItems(uid: string) {
+  await runTransaction(db, async (transaction) => {
+    const userReference = userPath(uid);
+    const userSnapshot = await transaction.get(userReference);
+    const currentItems = storedItems(userSnapshot.data()?.shopping);
+    if (!currentItems.length) return;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const groups = new Map<string, ShoppingItem[]>();
+    currentItems.forEach((item) => {
+      const date = item.done ? item.completedDate || today : today;
+      groups.set(date, [...(groups.get(date) || []), item]);
+    });
+
+    const historyReferences = [...groups.keys()].map((date) =>
+      doc(historyPath(uid), `shopping-history-${date}`),
+    );
+    const existingHistory = await Promise.all(
+      historyReferences.map((reference) => transaction.get(reference)),
+    );
+
+    [...groups.entries()].forEach(([date, groupedItems], index) => {
+      const reference = historyReferences[index];
+      const snapshot = existingHistory[index];
+      const existing = snapshot.exists()
+        ? storedHistory(snapshot.id, snapshot.data())
+        : null;
+      const historyItems = [
+        ...(existing?.items || []),
+        ...groupedItems.map((item) => ({
+          name: item.name,
+          qty: item.qty,
+          price: item.price,
+          ...(item.barcode ? { barcode: item.barcode } : {}),
+        })),
+      ];
+      const total =
+        (existing?.total || 0) +
+        groupedItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+      const historyData = {
+        id: reference.id,
+        userId: uid,
+        date,
+        total,
+        items: historyItems,
+      } as Record<string, unknown>;
+      const createdAt = existing ? snapshot.data()?.createdAt : null;
+      historyData.createdAt = createdAt || serverTimestamp();
+      transaction.set(reference, historyData, { merge: true });
+    });
+
+    transaction.set(
+      userReference,
+      { shopping: [], updatedAt: serverTimestamp() },
+      { merge: true },
+    );
+  });
+}
+
 export function subscribeShoppingHistory(
   uid: string,
   onData: (items: ShoppingHistory[]) => void,
@@ -256,6 +324,10 @@ export async function listShoppingHistory(uid: string) {
 
 export async function updateShoppingHistoryTitle(uid: string, id: string, title: string) {
   await updateDoc(doc(historyPath(uid), id), { title: title.trim().slice(0, 120) });
+}
+
+export async function updateShoppingHistoryPhoto(uid: string, id: string, photoUrl: string) {
+  await updateDoc(doc(historyPath(uid), id), { photoUrl });
 }
 
 export async function createShoppingHistory(

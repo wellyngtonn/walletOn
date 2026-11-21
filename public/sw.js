@@ -1,4 +1,4 @@
-const CACHE = "walleton-v3";
+const CACHE = "walleton-v4";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 function isCacheable(request) {
@@ -32,6 +32,24 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || !isCacheable(e.request)) return;
+
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put("/", clone));
+          }
+          return res;
+        })
+        .catch(() =>
+          caches.match(e.request).then((cached) => cached || caches.match("/"))
+        )
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const fetchPromise = fetch(e.request)

@@ -6,10 +6,11 @@ import { Sidebar } from "./sidebar";
 import { MonthPicker } from "./month-picker";
 import { TransactionModal } from "./transaction-modal";
 import { useAuth } from "@/hooks/useAuth";
-import { usePierreBalance } from "@/hooks/usePierreBalance";
-import { usePierreAutoSync } from "@/hooks/usePierreAutoSync";
+import { useBankProfile } from "@/hooks/useBankProfile";
+import { useBankAutoSync } from "@/hooks/useBankAutoSync";
 import { useTransactions } from "@/hooks/useTransactions";
 import type { Transaction } from "@/types";
+import type { BankProvider } from "@/utils/bank";
 
 type Ctx = {
   month: number;
@@ -18,9 +19,10 @@ type Ctx = {
   transactions: Transaction[];
   loading: boolean;
   error: string;
-  pierreBalance: number | null;
-  pierreAccountId: string | null;
-  pierreAccountName: string | null;
+  accountBalance: number | null;
+  accountId: string | null;
+  accountName: string | null;
+  bankProvider: BankProvider | null;
   openEdit: (t: Transaction) => void;
   openCreate: () => void;
 };
@@ -41,19 +43,21 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [editing, setEditing] = useState<Transaction | null>(null);
   const data = useTransactions(user?.uid, month, year);
   const {
-    balance: pierreBalance,
-    accountId: pierreAccountId,
-    accountName: pierreAccountName,
-    hasApiKey: pierreHasApiKey,
-    loading: pierreProfileLoading,
+    balance: accountBalance,
+    accountId,
+    accountName,
+    provider: bankProvider,
+    connected: bankConnected,
+    loading: bankProfileLoading,
     error: balanceError,
-  } = usePierreBalance(user?.uid);
+  } = useBankProfile(user?.uid);
 
-  usePierreAutoSync({
+  useBankAutoSync({
     uid: user?.uid,
-    hasApiKey: pierreHasApiKey,
-    preferredAccountId: pierreAccountId,
-    profileLoading: pierreProfileLoading,
+    connected: bankConnected,
+    provider: bankProvider,
+    preferredAccountId: accountId,
+    profileLoading: bankProfileLoading,
   });
 
   function openEdit(t: Transaction) {
@@ -64,6 +68,10 @@ function Inner({ children }: { children: React.ReactNode }) {
     setEditing(null);
     setModal(true);
   }
+
+  const pickerPages = ["/analise", "/planejamento"].some(
+    (page) => pathname === page || pathname === `${page}/`,
+  );
 
   return (
     <DashboardContext.Provider
@@ -76,9 +84,10 @@ function Inner({ children }: { children: React.ReactNode }) {
         },
         ...data,
         error: data.error || balanceError,
-        pierreBalance,
-        pierreAccountId,
-        pierreAccountName,
+        accountBalance,
+        accountId,
+        accountName,
+        bankProvider,
         openEdit,
         openCreate,
       }}
@@ -87,10 +96,7 @@ function Inner({ children }: { children: React.ReactNode }) {
       <main
         className="app-shell-main min-h-screen px-4 pb-32 pt-20 md:px-7 md:pt-7"
       >
-        {pathname === "/analise" ||
-        pathname === "/planejamento" ||
-        pathname === "/analise/" ||
-        pathname === "/planejamento/" ? (
+        {pickerPages ? (
           <header className="mb-5 flex items-center justify-end md:pr-[64px]">
             <div className="flex items-center gap-2">
               <MonthPicker

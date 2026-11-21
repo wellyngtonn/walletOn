@@ -4,7 +4,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function validTransaction(uid) {
-      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','referenceMonth','referenceYear','pierreId','category','accountId','recurrenceId','createdAt','updatedAt'])
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','referenceMonth','referenceYear','pierreId','externalId','provider','category','accountId','recurrenceId','createdAt','updatedAt'])
         && request.resource.data.keys().hasAll(['userId','type','description','amount','date','referenceMonth','referenceYear','updatedAt'])
         && request.resource.data.userId == uid
         && request.resource.data.type in ['income','expense','investment']
@@ -19,6 +19,8 @@ service cloud.firestore {
         && request.resource.data.referenceMonth >= 1 && request.resource.data.referenceMonth <= 12
         && request.resource.data.referenceYear is int
         && (!request.resource.data.keys().hasAny(['pierreId']) || request.resource.data.pierreId is string)
+        && (!request.resource.data.keys().hasAny(['externalId']) || request.resource.data.externalId is string)
+        && (!request.resource.data.keys().hasAny(['provider']) || request.resource.data.provider in ['pluggy','pierre'])
         && (!request.resource.data.keys().hasAny(['category']) || request.resource.data.category is string)
         && (!request.resource.data.keys().hasAny(['accountId']) || request.resource.data.accountId is string)
         && (!request.resource.data.keys().hasAny(['recurrenceId']) || request.resource.data.recurrenceId is string);
@@ -85,7 +87,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['completedDate']) || request.resource.data.completedDate == null || request.resource.data.completedDate is string);
     }
     function validShoppingHistory(uid) {
-      return request.resource.data.keys().hasOnly(['id','userId','date','title','total','items','createdAt'])
+      return request.resource.data.keys().hasOnly(['id','userId','date','title','total','items','photoUrl','createdAt'])
         && request.resource.data.keys().hasAll(['id','userId','date','total','items'])
         && request.resource.data.userId == uid
         && request.resource.data.id is string
@@ -95,6 +97,7 @@ service cloud.firestore {
         && request.resource.data.total >= 0
         && request.resource.data.items is list
         && (!request.resource.data.keys().hasAny(['title']) || (request.resource.data.title is string && request.resource.data.title.size() <= 120))
+        && (!request.resource.data.keys().hasAny(['photoUrl']) || (request.resource.data.photoUrl is string && request.resource.data.photoUrl.size() <= 500))
         && (!request.resource.data.keys().hasAny(['createdAt']) || request.resource.data.createdAt is timestamp);
     }
     match /users/{uid} {

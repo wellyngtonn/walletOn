@@ -3,17 +3,19 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import {
-  markPierreSyncComplete,
-} from "@/hooks/usePierreAutoSync";
-import { usePierreBalance } from "@/hooks/usePierreBalance";
+  markBankSyncComplete,
+} from "@/hooks/useBankAutoSync";
+import { useBankProfile } from "@/hooks/useBankProfile";
 import {
   savePierreKey,
   syncPierreRange,
+  triggerPierreUpdate,
   type PierreAccount,
 } from "@/services/pierre";
 import {
-  savePierreAccountSelection,
+  saveAccountSelection,
 } from "@/services/profile";
+import { Toast } from "@/components/toast";
 
 const MONTHS = [
   "Janeiro",
@@ -39,6 +41,9 @@ function errorMessage(error: unknown): string {
   if (detail.includes("failed-precondition") && detail.includes("api key")) {
     return "Configure uma API Key válida do Pierre.";
   }
+  if (detail.includes("api key")) {
+    return "API Key inválida ou expirada. Gere uma nova chave no Pierre e salve novamente.";
+  }
   if (detail.includes("permission-denied")) return "Você não tem permissão para sincronizar.";
   if (detail.includes("not-found")) return "A sincronização do Pierre ainda não foi publicada. Tente novamente mais tarde.";
   if (detail.includes("401")) return "API Key inválida.";
@@ -62,8 +67,9 @@ export function PierreImport() {
   const {
     accounts: savedAccounts,
     accountId: savedAccountId,
-    hasApiKey,
-  } = usePierreBalance(user?.uid);
+    pierreConnected,
+    pluggyConnected,
+  } = useBankProfile(user?.uid);
   const [key, setKey] = useState("");
   const [accounts, setAccounts] = useState<PierreAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState("");
@@ -86,7 +92,7 @@ export function PierreImport() {
     setSelectedAccountId(account.id);
     setBusy(true);
     try {
-      await savePierreAccountSelection(user.uid, account);
+      await saveAccountSelection(user.uid, "pierre", account);
       setToast(`Carteira selecionada: ${account.name}`);
     } catch (error) {
       setToast(errorMessage(error));
@@ -119,7 +125,7 @@ export function PierreImport() {
   }
 
   async function sync12Meses() {
-    if (!user || (!key.trim() && !hasApiKey)) {
+    if (!user || (!key.trim() && !pierreConnected)) {
       setToast("Configure a API Key primeiro.");
       return;
     }
@@ -139,9 +145,10 @@ export function PierreImport() {
         ago.toISOString().slice(0, 10),
         today.toISOString().slice(0, 10),
         selectedAccountId || savedAccountId,
+        true,
       );
       const imported = importedResult.imported;
-      markPierreSyncComplete();
+      markBankSyncComplete();
 
       setToast(
         imported > 0
@@ -163,7 +170,7 @@ export function PierreImport() {
   }
 
   async function importPeriodo() {
-    if (!user || (!key.trim() && !hasApiKey)) {
+    if (!user || (!key.trim() && !pierreConnected)) {
       setToast("Configure a API Key primeiro.");
       return;
     }
@@ -186,6 +193,7 @@ export function PierreImport() {
 
     let total = 0;
     let errors = 0;
+    let fatal = "";
 
     try {
       if (key.trim()) {
@@ -198,15 +206,25 @@ export function PierreImport() {
       return;
     }
 
+    try {
+      await triggerPierreUpdate();
+    } catch {
+      setPeriodoStatus("Atualização do Pierre indisponível; dados podem estar desatualizados.");
+    }
+
     for (const { year, month } of meses) {
       setPeriodoStatus(`Buscando ${MONTHS[month]} ${year}...`);
       try {
         const start = `${year}-${String(month + 1).padStart(2, "0")}-01`;
         const end = `${year}-${String(month + 1).padStart(2, "0")}-${new Date(year, month + 1, 0).getDate()}`;
-        const result = await syncPierreRange(start, end, selectedAccountId || savedAccountId);
+        const result = await syncPierreRange(start, end, selectedAccountId || savedAccountId, false);
         total += result.imported;
         setPeriodoStatus(`${MONTHS[month]} ${year}: ${result.imported} importadas`);
       } catch (error) {
+        if (String((error as { code?: unknown })?.code || "") === "412") {
+          fatal = errorMessage(error);
+          break;
+        }
         errors++;
         setPeriodoStatus(`${MONTHS[month]} ${year}: ${errorMessage(error)}`);
       }
@@ -215,7 +233,12 @@ export function PierreImport() {
     setShowPeriodo(false);
     setSelectedMonths(new Set());
     setPeriodoStatus("");
-    if (!errors) markPierreSyncComplete();
+    if (fatal) {
+      setToast(fatal);
+      setBusy(false);
+      return;
+    }
+    if (!errors) markBankSyncComplete();
     setToast(
       `${total} transações de ${meses.length} ${meses.length === 1 ? "mês" : "meses"} importadas${errors ? ` (${errors} erro${errors === 1 ? "" : "s"})` : ""}.`,
     );
@@ -228,6 +251,8 @@ export function PierreImport() {
     setSelectedMonths(new Set());
     setPeriodoStatus("");
   }
+
+  if (pluggyConnected) return null;
 
   return (
     <>
@@ -243,7 +268,7 @@ export function PierreImport() {
             className="settings-input"
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            placeholder={hasApiKey ? "Chave configurada; cole outra para substituir" : "sk-... (API Key)"}
+            placeholder={pierreConnected ? "Chave configurada; cole outra para substituir" : "sk-... (API Key)"}
           />
           <button className="btn-primary" onClick={testKey} disabled={busy}>
             {busy ? "Testando..." : "Salvar Chave"}
@@ -400,14 +425,7 @@ export function PierreImport() {
         </div>
       )}
 
-      {toast && (
-        <div
-          className="fixed bottom-24 left-1/2 z-[9999] -translate-x-1/2 rounded-[20px] bg-[var(--text)] px-5 py-2.5 text-sm font-semibold text-[var(--bg)] shadow-lg"
-          onClick={() => setToast("")}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} onDismiss={() => setToast("")} />
     </>
   );
 }

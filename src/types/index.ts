@@ -10,6 +10,8 @@ export interface Transaction {
   referenceMonth: number;
   referenceYear: number;
   pierreId?: string;
+  externalId?: string;
+  provider?: "pluggy" | "pierre";
   category?: string;
   accountId?: string;
   recurrenceId?: string;
@@ -76,6 +78,7 @@ export interface ShoppingItem {
   createdDate: string;
   completedDate?: string | null;
   order: number;
+  barcode?: string;
 }
 
 export type ShoppingItemInput = Omit<ShoppingItem, "id" | "userId">;
@@ -84,6 +87,7 @@ export interface ShoppingHistoryItem {
   name: string;
   qty: number;
   price?: number;
+  barcode?: string;
 }
 
 export interface ShoppingHistory {
@@ -93,6 +97,7 @@ export interface ShoppingHistory {
   date: string;
   total: number;
   items: ShoppingHistoryItem[];
+  photoUrl?: string;
 }
 
 export type ShoppingHistoryInput = Omit<ShoppingHistory, "id" | "userId">;

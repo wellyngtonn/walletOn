@@ -21,8 +21,10 @@ import {
   listRecurrences,
   listTransactions,
 } from "@/services/transactions";
+import { PluggyImport } from "@/components/pluggy-import";
 import { PierreImport } from "@/components/pierre-import";
 import { StatementExport } from "@/components/statement-export";
+import { Toast } from "@/components/toast";
 import type { AccentColor } from "@/types";
 import {
   normalizeBackup,
@@ -129,6 +131,9 @@ export default function ConfiguracoesPage() {
       const existingPierreIds = new Set(
         existingTransactions.map((item) => item.pierreId).filter(Boolean),
       );
+      const existingExternalIds = new Set(
+        existingTransactions.map((item) => item.externalId).filter(Boolean),
+      );
       const existingPlanIds = new Set(existingPlans.map((item) => item.id));
       const existingRecurrenceIds = new Set(existingRecurrences.map((item) => item.id));
       const existingShoppingIds = new Set(existingShopping.map((item) => item.id));
@@ -171,7 +176,8 @@ export default function ConfiguracoesPage() {
         .filter(
           (item) =>
             (!item.id || !existingTransactionIds.has(item.id)) &&
-            (!item.data.pierreId || !existingPierreIds.has(item.data.pierreId)),
+            (!item.data.pierreId || !existingPierreIds.has(item.data.pierreId)) &&
+            (!item.data.externalId || !existingExternalIds.has(item.data.externalId)),
         );
       await createTransactionsBatch(user.uid, newTransactions);
       const newShoppingCount = await createShoppingItemsBatch(
@@ -287,6 +293,8 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
 
+        <PluggyImport />
+
         <PierreImport />
 
         <div className="settings-card">
@@ -327,16 +335,7 @@ export default function ConfiguracoesPage() {
         </div>
       </div>
 
-      {toast && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="fixed bottom-24 left-1/2 z-[9999] -translate-x-1/2 rounded-[20px] bg-[var(--text)] px-5 py-2.5 text-sm font-semibold text-[var(--bg)] shadow-lg"
-          onClick={() => setToast("")}
-        >
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} onDismiss={() => setToast("")} />
     </>
   );
 }

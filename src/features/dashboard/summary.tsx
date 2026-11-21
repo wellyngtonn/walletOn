@@ -1,49 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import type { Transaction } from "@/types";
-import { currency, dateBR } from "@/utils/format";
-import { pierreCategoryIcon } from "@/utils/pierre-category";
+import { currency, dateBR, typeLabels } from "@/utils/format";
+import { isImportedTransaction } from "@/utils/bank";
+import { categoryIcon } from "@/utils/pierre-category";
 import { cleanTransactionName } from "@/utils/transaction-name";
 import { ExpenseHeatmap } from "@/components/expense-heatmap";
-import { usePierreSyncStatus } from "@/hooks/usePierreAutoSync";
-
-const typeLabels: Record<string, string> = {
-  income: "Receita",
-  expense: "Despesa",
-  investment: "Investimento",
-};
+import { useBankSyncStatus } from "@/hooks/useBankAutoSync";
 
 export function Summary({
   items,
   month,
   year,
-  pierreBalance,
-  pierreAccountId,
-  pierreAccountName,
+  accountBalance,
+  accountId,
+  accountName,
 }: {
   items: Transaction[];
   month: number;
   year: number;
-  pierreBalance: number | null;
-  pierreAccountId: string | null;
-  pierreAccountName: string | null;
+  accountBalance: number | null;
+  accountId: string | null;
+  accountName: string | null;
 }) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [valuesHidden, setValuesHidden] = useState(true);
-  const pierreSynced = usePierreSyncStatus();
-  const visibleItems = pierreAccountId
+  const bankSynced = useBankSyncStatus();
+
+  useEffect(() => {
+    setSelectedDay(null);
+  }, [month, year]);
+  const visibleItems = accountId
     ? items.filter(
         (transaction) =>
-          transaction.pierreId && transaction.accountId === pierreAccountId,
+          isImportedTransaction(transaction) &&
+          transaction.accountId === accountId,
       )
     : items;
 
   const filteredItems = selectedDay
     ? visibleItems.filter(
         (transaction) =>
-          transaction.pierreId &&
+          isImportedTransaction(transaction) &&
           transaction.date ===
             `${year}-${String(month).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`,
       )
@@ -63,14 +63,14 @@ export function Summary({
         ),
       )
     : null;
-  const accountLabel = (pierreAccountName || "Conta não importada")
+  const accountLabel = (accountName || "Conta não importada")
     .replace(/^Carteira\s+\d+\s*-\s*/i, "")
     .toUpperCase();
   const displayedBalance = valuesHidden
     ? "••••••"
-    : pierreBalance === null
+    : accountBalance === null
       ? "—"
-      : currency(pierreBalance);
+      : currency(accountBalance);
 
   return (
     <>
@@ -78,11 +78,11 @@ export function Summary({
         <div className="saldo-mes-main">
           <span className="saldo-mes-title">Saldo da conta</span>
           <div className="saldo-mes-account">
-            {pierreSynced && (
+            {bankSynced && (
               <span
                 className="pierre-sync-dot"
-                title="Pierre Finance sincronizado"
-                aria-label="Pierre Finance sincronizado"
+                title="Dados bancários sincronizados"
+                aria-label="Dados bancários sincronizados"
               />
             )}
             <span className="saldo-mes-account-name">{accountLabel}</span>
@@ -147,7 +147,7 @@ export function Summary({
                     title={transaction.category || "Outros"}
                     aria-label={`Categoria: ${transaction.category || "Outros"}`}
                   >
-                    {pierreCategoryIcon(
+                    {categoryIcon(
                       transaction.category,
                       transaction.description,
                       transaction.type,

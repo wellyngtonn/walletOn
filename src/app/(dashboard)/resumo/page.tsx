@@ -9,9 +9,9 @@ export default function Page() {
     error,
     month,
     year,
-    pierreBalance,
-    pierreAccountId,
-    pierreAccountName,
+    accountBalance,
+    accountId,
+    accountName,
   } = useDashboard();
   if (loading) return <p className="text-[var(--text3)]">Carregando dados...</p>;
   return (
@@ -21,9 +21,9 @@ export default function Page() {
         items={transactions}
         month={month}
         year={year}
-        pierreBalance={pierreBalance}
-        pierreAccountId={pierreAccountId}
-        pierreAccountName={pierreAccountName}
+        accountBalance={accountBalance}
+        accountId={accountId}
+        accountName={accountName}
       />
     </>
   );

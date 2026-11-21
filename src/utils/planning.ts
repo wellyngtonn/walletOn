@@ -1,25 +1,19 @@
 import type { Recurrence } from "../types";
-
-function normalizeDescription(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR");
-}
+import { normalizeText } from "./text";
 
 export function getDescriptionSuggestions(
   descriptions: string[],
   input: string,
   limit = 6,
 ) {
-  const query = normalizeDescription(input.trim());
+  const query = normalizeText(input.trim());
   if (query.length < 3) return [];
 
   const matches = new Map<string, { description: string; count: number }>();
   descriptions.forEach((value) => {
     const description = value.trim();
     if (!description) return;
-    const key = normalizeDescription(description);
+    const key = normalizeText(description);
     if (!key.startsWith(query)) return;
     const current = matches.get(key);
     matches.set(key, {

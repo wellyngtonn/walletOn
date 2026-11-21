@@ -1,32 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  subscribePierreProfile,
-  type PierreProfile,
-} from "@/services/profile";
+import { subscribeBankProfile, type BankProfile } from "@/services/profile";
 
-export function usePierreBalance(uid: string | undefined) {
+const emptyProfile: BankProfile = {
+  provider: null,
+  connected: false,
+  pierreConnected: false,
+  pluggyConnected: false,
+  balance: null,
+  accountId: null,
+  accountName: null,
+  accounts: [],
+  itemId: null,
+  itemStatus: null,
+  connectorName: null,
+};
+
+export function useBankProfile(uid: string | undefined) {
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<PierreProfile>({
-    balance: null,
-    accountId: null,
-    accountName: null,
-    accounts: [],
-    hasApiKey: false,
-  });
+  const [profile, setProfile] = useState<BankProfile>(emptyProfile);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!uid) {
-      setProfile({ balance: null, accountId: null, accountName: null, accounts: [], hasApiKey: false });
+      setProfile(emptyProfile);
       setLoading(false);
       return;
     }
 
     setLoading(true);
     setError("");
-    return subscribePierreProfile(
+    return subscribeBankProfile(
       uid,
       (nextProfile) => {
         setProfile(nextProfile);

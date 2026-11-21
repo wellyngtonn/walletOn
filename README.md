@@ -33,18 +33,56 @@ No [Console do Firebase](https://console.firebase.google.com/):
 
 As chaves públicas do Firebase identificam o projeto, mas a segurança dos dados depende das regras incluídas neste repositório. Nunca use chaves administrativas no navegador.
 
-## Sincronização Pierre com Vercel
+## Importação bancária com Vercel
 
-A sincronização do Pierre usa `api/pierre.ts` na Vercel e mantém o Firebase apenas para autenticação e Firestore. Isso evita a necessidade de Cloud Functions e do plano Blaze no Firebase.
+A importação usa as Functions `api/pluggy.ts` (Open Finance, recomendado),
+`api/pluggy-webhook.ts` (notificações do Pluggy) e `api/pierre.ts` (fallback
+legado). O Firebase continua responsável apenas por autenticação e Firestore,
+sem Cloud Functions nem plano Blaze.
 
-Configure também estas variáveis somente no ambiente da Vercel:
+### Pluggy (Open Finance)
+
+1. No [Dashboard do Pluggy](https://dashboard.pluggy.ai), crie uma aplicação e
+   copie `CLIENT_ID` e `CLIENT_SECRET`. Garanta que os produtos `ACCOUNTS` e
+   `TRANSACTIONS` estejam habilitados na aplicação.
+2. Cadastre os domínios do app no painel (por exemplo `setenta.web.app`,
+   `wallet-on.vercel.app` e `localhost`).
+3. Configure na Vercel:
+
+   - `PLUGGY_CLIENT_ID` e `PLUGGY_CLIENT_SECRET` (somente servidor);
+   - `PLUGGY_WEBHOOK_SECRET`: segredo aleatório;
+   - `PLUGGY_WEBHOOK_URL`:
+     `https://seu-projeto.vercel.app/api/pluggy-webhook?secret=SEGREDO`;
+   - `NEXT_PUBLIC_PLUGGY_API_URL`:
+     `https://seu-projeto.vercel.app/api/pluggy`. Quando vazio, o app usa
+     `/api/pluggy` na Vercel e, no Firebase Hosting, recorre a
+     `https://wallet-on.vercel.app/api/pluggy`.
+   - `NEXT_PUBLIC_PLUGGY_SANDBOX`: `true` para exibir também os conectores de
+     teste (Pluggy Bank/Sandbox). Use enquanto a aplicação não tiver acesso à
+     produção e remova depois da aprovação.
+
+4. Em **Configurações > Open Finance (Pluggy)**, clique em **Conectar conta**.
+   O widget do Pluggy abre, o usuário autoriza o consentimento e o app guarda o
+   `itemId` apenas no servidor (`users/{uid}/private/pluggy`).
+
+O saldo e as contas ficam em `users/{uid}` (`pluggyAccounts`, `pluggyAccountId`,
+`pluggyBalance`). As transações são gravadas em `users/{uid}/transactions` com
+`externalId` e `provider: "pluggy"`. O webhook apenas sinaliza a sincronização;
+os dados sempre são lidos pela API com a API Key do servidor.
+
+### Pierre (fallback)
+
+A sincronização do Pierre continua disponível em `api/pierre.ts` e aparece em
+**Configurações** quando o Pluggy não está conectado. Configure:
 
 - `FIREBASE_PROJECT_ID`: `wallet-on-c0b05`;
 - `FIREBASE_CLIENT_EMAIL`: e-mail de uma conta de serviço do Firebase;
 - `FIREBASE_PRIVATE_KEY`: chave privada dessa conta, preservando as quebras de linha como `\\n`;
 - `NEXT_PUBLIC_PIERRE_API_URL`: URL pública da Function, por exemplo `https://seu-projeto.vercel.app/api/pierre`.
 
-A conta de serviço é usada apenas no servidor para validar o token do usuário, acessar a chave Pierre na coleção privada e gravar transações. Nunca use essas três primeiras variáveis com o prefixo `NEXT_PUBLIC_`.
+A conta de serviço é usada apenas no servidor para validar o token do usuário,
+acessar a chave Pierre na coleção privada e gravar transações. Nunca use essas
+três primeiras variáveis com o prefixo `NEXT_PUBLIC_`.
 
 ## Estrutura
 

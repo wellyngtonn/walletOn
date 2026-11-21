@@ -143,9 +143,13 @@ export function normalizeTransaction(
   const category = stringValue(item.category ?? item.cat);
   const accountId = stringValue(item.accountId ?? item.accId);
   const pierreId = stringValue(item.pierreId);
+  const externalId = stringValue(item.externalId);
+  const provider = stringValue(item.provider);
   if (category) data.category = category;
   if (accountId) data.accountId = accountId;
   if (pierreId) data.pierreId = pierreId;
+  if (externalId) data.externalId = externalId;
+  if (provider === "pluggy" || provider === "pierre") data.provider = provider;
   if (recurrenceId != null) data.recurrenceId = stringValue(recurrenceId);
   return { id: importId("tx", item.id), data };
 }
@@ -230,6 +234,7 @@ export function normalizeShoppingItem(
   );
   const price = amountValue(item.price ?? item.preco ?? item.amount);
   const completedDate = dateValue(item.completedDate ?? item.dataConclusao);
+  const barcode = stringValue(item.barcode ?? item.code);
   const data: ShoppingItemInput = {
     name: name.slice(0, 120),
     qty: quantity,
@@ -238,6 +243,7 @@ export function normalizeShoppingItem(
     createdDate,
     completedDate: completedDate || null,
     order: Math.max(0, Math.trunc(Number(item.order) || 0)),
+    ...(barcode ? { barcode } : {}),
   };
   return {
     oldId: stringValue(item.id),
@@ -261,10 +267,16 @@ export function normalizeShoppingHistory(
       const qty = Math.max(1, Math.trunc(Number(historyItem?.qty) || 1));
       if (!name) return null;
       const price = amountValue(historyItem?.price);
-      return { name: name.slice(0, 120), qty, price };
+      const barcode = stringValue(historyItem?.barcode ?? historyItem?.code);
+      return {
+        name: name.slice(0, 120),
+        qty,
+        price,
+        ...(barcode ? { barcode } : {}),
+      };
     })
     .filter(
-      (historyItem): historyItem is { name: string; qty: number; price: number } =>
+      (historyItem): historyItem is { name: string; qty: number; price: number; barcode?: string } =>
         historyItem !== null,
     );
   if (!items.length) return null;

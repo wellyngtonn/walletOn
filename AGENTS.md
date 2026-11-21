@@ -1,11 +1,15 @@
 # AGENTS.md
 
+## Idioma
+
+Comunique-se sempre em português (Brasil).
+
 ## Publicação (deploy)
 
 O app é publicado em dois destinos e **qualquer alteração deve ir para ambos**:
 
 1. **Firebase Hosting** (frontend PWA em `setenta.web.app`) + regras do Firestore/Storage.
-2. **Vercel** (`wallet-on.vercel.app`) — Functions `api/*` (barcode, pierre) e o mesmo frontend.
+2. **Vercel** (`wallet-on.vercel.app`) — Functions `api/*` (barcode, pierre, pluggy, pluggy-webhook) e o mesmo frontend.
 
 Comando único, sempre que for publicar:
 
@@ -26,6 +30,7 @@ logada; ao publicar o Firebase, a CLI `firebase` usa OAuth.
 
 Variáveis de produção (segredos, só na Vercel): `FIREBASE_WEB_API_KEY`,
 `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`,
-`ALLOWED_ORIGIN`, `COSMOS_API_TOKEN`,
-`COSMOS_USER_AGENT`. Nunca commitar segredos nem usar prefixo `NEXT_PUBLIC_`
+`ALLOWED_ORIGIN`, `COSMOS_API_TOKEN`, `COSMOS_USER_AGENT`,
+`PLUGGY_CLIENT_ID`, `PLUGGY_CLIENT_SECRET`, `PLUGGY_WEBHOOK_SECRET`,
+`PLUGGY_WEBHOOK_URL`. Nunca commitar segredos nem usar prefixo `NEXT_PUBLIC_`
 nas credenciais de servidor.
