@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { cleanTransactionName } from "../src/utils/transaction-name.js";
 import { normalizeText } from "../src/utils/text.js";
 import { selectDefaultPierreAccount } from "../src/utils/pierre.js";
+import { categorizeTransaction } from "../src/utils/transaction-category.js";
 import {
   bodyRecord,
   errorStatus,
@@ -190,14 +191,20 @@ export function mapPierreTransactions(
       accountObject?.accountId ||
       "";
     const matchedAccountId = accountIdsByName.get(normalizeText(accountName));
+    const mappedType = isDebit ? ("expense" as const) : ("income" as const);
 
     return {
       id: String(transaction.id || transaction.transactionId || transaction._id || ""),
       description,
       amount: Math.abs(amount),
       date,
-      type: isDebit ? ("expense" as const) : ("income" as const),
-      category: String(transaction.category || transaction.categoryName || "Outros"),
+      type: mappedType,
+      category: categorizeTransaction({
+        description,
+        category: String(transaction.category || transaction.categoryName || ""),
+        merchantName,
+        type: mappedType,
+      }),
       accountId: String(directAccountId || matchedAccountId || fallbackAccountId || ""),
     };
   }).filter((transaction) => transaction.id && transaction.amount > 0 && validDate(transaction.date));

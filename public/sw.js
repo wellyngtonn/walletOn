@@ -1,4 +1,4 @@
-const CACHE = "walleton-v4";
+const CACHE = "walleton-v5";
 const PRECACHE = ["/", "/manifest.webmanifest", "/icon.svg"];
 
 function isCacheable(request) {

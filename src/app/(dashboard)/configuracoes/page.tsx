@@ -25,6 +25,7 @@ import { PluggyImport } from "@/components/pluggy-import";
 import { PierreImport } from "@/components/pierre-import";
 import { StatementExport } from "@/components/statement-export";
 import { Toast } from "@/components/toast";
+import { recategorizeTransactions } from "@/services/pluggy";
 import type { AccentColor } from "@/types";
 import {
   normalizeBackup,
@@ -49,6 +50,7 @@ export default function ConfiguracoesPage() {
   const [mounted, setMounted] = useState(false);
   const [accent, setAccent] = useState<AccentColor>("green");
   const [toast, setToast] = useState("");
+  const [recategorizing, setRecategorizing] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -207,6 +209,28 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  async function recategorize() {
+    if (!user || recategorizing) return;
+    setRecategorizing(true);
+    setToast("Recategorizando lançamentos...");
+    try {
+      const result = await recategorizeTransactions();
+      setToast(
+        result.updated > 0
+          ? `${result.updated} lançamentos recategorizados.`
+          : "Nenhum lançamento para recategorizar.",
+      );
+    } catch (error) {
+      setToast(
+        error instanceof Error
+          ? `Falha: ${error.message}`
+          : "Falha ao recategorizar lançamentos.",
+      );
+    } finally {
+      setRecategorizing(false);
+    }
+  }
+
   async function clearAll() {
     if (!user) return;
     if (
@@ -315,6 +339,13 @@ export default function ConfiguracoesPage() {
                 style={{ display: "none" }}
               />
             </label>
+            <button
+              onClick={() => void recategorize()}
+              className="btn-outline"
+              disabled={recategorizing}
+            >
+              {recategorizing ? "Recategorizando..." : "Recategorizar Lançamentos"}
+            </button>
             <button onClick={clearAll} className="btn-danger">
               Apagar Todos os Dados
             </button>

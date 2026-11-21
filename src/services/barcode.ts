@@ -1,6 +1,11 @@
 import { auth } from "@/lib/firebase/config";
+import { withTrailingSlash } from "@/utils/api-url";
 import { shoppingProductName } from "@/utils/shopping-product";
 import { catalogProduct, saveCatalogProduct } from "@/services/product-catalog";
+
+const barcodeApiUrl = withTrailingSlash(
+  process.env.NEXT_PUBLIC_BARCODE_API_URL || "/api/barcode",
+);
 
 export async function lookupBarcode(code: string, signal: AbortSignal) {
   const user = auth.currentUser;
@@ -20,7 +25,7 @@ export async function lookupBarcode(code: string, signal: AbortSignal) {
   try {
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error("Faça login para consultar produtos.");
-    const response = await fetch(process.env.NEXT_PUBLIC_BARCODE_API_URL || "/api/barcode", {
+    const response = await fetch(barcodeApiUrl, {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ barcode: code }), signal,
     });

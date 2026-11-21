@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase/config";
+import { withTrailingSlash } from "@/utils/api-url";
 
 export interface PierreAccount {
   id: string;
@@ -9,7 +10,17 @@ export interface PierreAccount {
 type SaveKeyResponse = { ok: boolean; message: string; accounts: PierreAccount[] };
 type SyncResponse = { imported: number };
 
-const pierreApiUrl = process.env.NEXT_PUBLIC_PIERRE_API_URL || "/api/pierre";
+function pierreApiUrl() {
+  const configured = process.env.NEXT_PUBLIC_PIERRE_API_URL;
+  if (configured) return withTrailingSlash(configured);
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname.endsWith(".web.app")
+  ) {
+    return "https://wallet-on.vercel.app/api/pierre/";
+  }
+  return "/api/pierre/";
+}
 const PIERRE_CLIENT_TIMEOUT_MS = 45_000;
 
 type PierreRequest = {
@@ -28,7 +39,7 @@ async function callPierre<T>(body: PierreRequest): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), PIERRE_CLIENT_TIMEOUT_MS);
   try {
-    const response = await fetch(pierreApiUrl, {
+    const response = await fetch(pierreApiUrl(), {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

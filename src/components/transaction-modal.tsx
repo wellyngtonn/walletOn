@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { createTransaction, updateTransaction } from "@/services/transactions";
 import type { Transaction, TransactionInput, TransactionType } from "@/types";
+import { CATEGORY_LABELS } from "@/utils/categories";
 import { cleanTransactionName } from "@/utils/transaction-name";
 
 export function TransactionModal({
@@ -28,6 +29,7 @@ export function TransactionModal({
     date: new Date().toISOString().slice(0, 10),
     referenceMonth: month,
     referenceYear: year,
+    category: "Outros",
   });
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export function TransactionModal({
               date: transaction.date,
               referenceMonth: transaction.referenceMonth,
               referenceYear: transaction.referenceYear,
+              category: transaction.category || "Outros",
             }
           : {
               type: "expense",
@@ -49,6 +52,7 @@ export function TransactionModal({
               date: new Date().toISOString().slice(0, 10),
               referenceMonth: month,
               referenceYear: year,
+              category: "Outros",
             },
       );
   }, [open, transaction, month, year]);
@@ -113,6 +117,20 @@ export function TransactionModal({
               }
               placeholder="Descrição (ex.: Supermercado)"
             />
+            <select
+              className="field"
+              aria-label="Categoria"
+              value={form.category || "Outros"}
+              onChange={(e) =>
+                setForm({ ...form, category: e.target.value })
+              }
+            >
+              {CATEGORY_LABELS.map((label) => (
+                <option key={label} value={label}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <div className="transaction-date-row">
               <input
                 required

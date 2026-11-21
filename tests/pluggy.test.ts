@@ -63,9 +63,9 @@ test("converte DEBIT em despesa e CREDIT em receita", () => {
   assert.equal(items.length, 2);
   assert.equal(items[0].type, "expense");
   assert.equal(items[0].amount, 50);
-  assert.equal(items[0].category, "Alimentação");
+  assert.equal(items[0].category, "Supermercado");
   assert.equal(items[1].type, "income");
-  assert.equal(items[1].category, "Outros");
+  assert.equal(items[1].category, "Salário");
 });
 
 test("usa o sinal do valor quando o tipo nao vem no payload", () => {

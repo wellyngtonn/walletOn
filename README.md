@@ -70,6 +70,12 @@ O saldo e as contas ficam em `users/{uid}` (`pluggyAccounts`, `pluggyAccountId`,
 `externalId` e `provider: "pluggy"`. O webhook apenas sinaliza a sincronização;
 os dados sempre são lidos pela API com a API Key do servidor.
 
+A categorização é híbrida: usa a categoria do Pluggy quando disponível, depois
+regras locais por descrição/estabelecimento e, por último, o tipo do lançamento.
+Em **Configurações > Dados** o botão **Recategorizar Lançamentos** reprocessa os
+que ficaram em "Outros", e a categoria também pode ser corrigida manualmente ao
+editar qualquer lançamento.
+
 ### Pierre (fallback)
 
 A sincronização do Pierre continua disponível em `api/pierre.ts` e aparece em

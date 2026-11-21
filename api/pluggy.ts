@@ -1,4 +1,7 @@
-import { FieldValue } from "firebase-admin/firestore";
+import {
+  FieldValue,
+  type DocumentReference,
+} from "firebase-admin/firestore";
 import {
   mapPluggyAccounts,
   mapPluggyTransactions,
@@ -7,6 +10,10 @@ import {
   type MappedBankTransaction,
 } from "../src/utils/pluggy.js";
 import { selectDefaultAccount } from "../src/utils/bank.js";
+import {
+  canonicalCategory,
+  categorizeTransaction,
+} from "../src/utils/transaction-category.js";
 import {
   ApiError,
   bodyRecord,
@@ -159,6 +166,49 @@ async function persistPluggyTransactions(
   }
 
   return newItems.length;
+}
+
+async function recategorizeTransactions(uid: string) {
+  const snapshot = await userReference(uid).collection("transactions").get();
+  const updates: Array<{ reference: DocumentReference; category: string }> = [];
+  let imported = 0;
+
+  snapshot.docs.forEach((document) => {
+    const data = document.data();
+    if (!data.pierreId && !data.externalId) return;
+    imported += 1;
+
+    const current = typeof data.category === "string" ? data.category : "";
+    if (canonicalCategory(current) === current && current !== "Outros") return;
+
+    const type =
+      data.type === "income" || data.type === "investment"
+        ? data.type
+        : "expense";
+    const category = categorizeTransaction({
+      description:
+        typeof data.description === "string" ? data.description : "",
+      category: current,
+      type,
+    });
+
+    if (category && category !== current) {
+      updates.push({ reference: document.ref, category });
+    }
+  });
+
+  for (let start = 0; start < updates.length; start += 450) {
+    const batch = firestore().batch();
+    updates.slice(start, start + 450).forEach(({ reference, category }) => {
+      batch.update(reference, {
+        category,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  }
+
+  return { updated: updates.length, imported };
 }
 
 async function syncPluggy(uid: string, body: Record<string, unknown>) {
@@ -381,6 +431,9 @@ export default async function handler(
     }
     if (action === "sync") {
       return response.status(200).json(await syncPluggy(uid, body));
+    }
+    if (action === "recategorize") {
+      return response.status(200).json(await recategorizeTransactions(uid));
     }
     if (action === "update") {
       return response.status(200).json(await updatePluggyItem(uid));

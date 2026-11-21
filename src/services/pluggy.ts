@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase/config";
+import { withTrailingSlash } from "@/utils/api-url";
 
 export interface PluggyAccount {
   id: string;
@@ -30,18 +31,25 @@ const PLUGGY_CLIENT_TIMEOUT_MS = 55_000;
 
 function pluggyApiUrl() {
   const configured = process.env.NEXT_PUBLIC_PLUGGY_API_URL;
-  if (configured) return configured;
+  if (configured) return withTrailingSlash(configured);
   if (
     typeof window !== "undefined" &&
     window.location.hostname.endsWith(".web.app")
   ) {
-    return "https://wallet-on.vercel.app/api/pluggy";
+    return "https://wallet-on.vercel.app/api/pluggy/";
   }
-  return "/api/pluggy";
+  return "/api/pluggy/";
 }
 
 type PluggyRequest = {
-  action: "connect-token" | "save" | "sync" | "update" | "status" | "disconnect";
+  action:
+    | "connect-token"
+    | "save"
+    | "sync"
+    | "update"
+    | "status"
+    | "disconnect"
+    | "recategorize";
   itemId?: string;
   fromDate?: string;
   toDate?: string;
@@ -132,4 +140,10 @@ export function getPluggyStatus() {
 
 export function disconnectPluggy() {
   return callPluggy<{ ok: boolean }>({ action: "disconnect" });
+}
+
+export function recategorizeTransactions() {
+  return callPluggy<{ updated: number; imported: number }>({
+    action: "recategorize",
+  });
 }

@@ -1,4 +1,5 @@
 import type { TransactionType } from "../types";
+import { categorizeTransaction } from "./transaction-category.js";
 import { cleanTransactionName } from "./transaction-name.js";
 
 export interface PluggyAccountShape {
@@ -20,6 +21,8 @@ export interface PluggyTransactionShape {
   type?: string | null;
   status?: string | null;
   category?: string | null;
+  categoryId?: string | null;
+  operationType?: string | null;
   accountId?: string | null;
   merchant?: { name?: string | null; category?: string | null } | null;
 }
@@ -42,33 +45,6 @@ export interface MappedBankTransaction {
   category: string;
   accountId: string;
 }
-
-const PLUGGY_CATEGORY_ALIASES: Record<string, string> = {
-  groceries: "Alimentação",
-  food: "Alimentação",
-  restaurant: "Alimentação",
-  restaurants: "Alimentação",
-  transport: "Transporte",
-  transportation: "Transporte",
-  travel: "Transporte",
-  health: "Saúde",
-  healthcare: "Saúde",
-  education: "Educação",
-  housing: "Moradia",
-  home: "Moradia",
-  utilities: "Moradia",
-  shopping: "Compras",
-  entertainment: "Lazer",
-  leisure: "Lazer",
-  transfer: "Transferências",
-  transfers: "Transferências",
-  salary: "Receitas",
-  income: "Receitas",
-  investment: "Investimento",
-  investments: "Investimento",
-  services: "Serviços",
-  service: "Serviços",
-};
 
 function recordOf(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
@@ -100,13 +76,6 @@ function accountLabel(account: PluggyAccountShape, index: number) {
     textValue(account.subtype) ||
     "Conta";
   return `Carteira ${index + 1} - ${label}`;
-}
-
-function categoryValue(record: PluggyTransactionShape) {
-  const raw =
-    textValue(record.category) || textValue(record.merchant?.category);
-  if (!raw) return "Outros";
-  return PLUGGY_CATEGORY_ALIASES[raw.toLowerCase()] || raw;
 }
 
 function directionValue(
@@ -167,6 +136,8 @@ export function mapPluggyTransactions(
         type: textValue(transaction.type),
         status: textValue(transaction.status),
         category: textValue(transaction.category),
+        categoryId: textValue(transaction.categoryId),
+        operationType: textValue(transaction.operationType),
         accountId: textValue(transaction.accountId),
         merchant: merchant
           ? {
@@ -182,14 +153,23 @@ export function mapPluggyTransactions(
           textValue(shape.merchant?.name) ||
           "Pluggy",
       ).slice(0, 120);
+      const mappedType = directionValue(shape.type ?? "", amount);
 
       return {
         id: shape.id,
         description,
         amount: Math.abs(amount),
         date: shape.date ?? "",
-        type: directionValue(shape.type ?? "", amount),
-        category: categoryValue(shape),
+        type: mappedType,
+        category: categorizeTransaction({
+          description,
+          category: shape.category,
+          categoryId: shape.categoryId,
+          merchantName: shape.merchant?.name,
+          merchantCategory: shape.merchant?.category,
+          operationType: shape.operationType,
+          type: mappedType,
+        }),
         accountId: shape.accountId || fallbackAccountId || "",
       };
     })
