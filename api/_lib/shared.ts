@@ -60,14 +60,23 @@ export async function verifyFirebaseToken(token: string) {
   const apiKey = process.env.FIREBASE_WEB_API_KEY;
   if (!apiKey)
     throw new Error("FIREBASE_WEB_API_KEY não está configurada na Vercel.");
-  const result = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ idToken: token }),
-    },
-  );
+  let result: Response;
+  try {
+    result = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken: token }),
+        signal: AbortSignal.timeout(7000),
+      },
+    );
+  } catch {
+    throw new ApiError(
+      "Não foi possível validar a sessão agora. Tente novamente.",
+      503,
+    );
+  }
   if (!result.ok)
     throw Object.assign(new Error("Token Firebase inválido."), { status: 401 });
   const body = (await result.json()) as {
@@ -83,9 +92,9 @@ export async function verifyFirebaseToken(token: string) {
 
 export function bearerToken(request: ApiRequest) {
   const authorization = request.headers.authorization;
-  return typeof authorization === "string"
-    ? authorization.replace(/^Bearer\s+/i, "").trim()
-    : "";
+  if (typeof authorization !== "string") return "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
 }
 
 export function bodyRecord(body: unknown): Record<string, unknown> {

@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { Transaction } from "../types";
 import { currency, dateBR } from "./format";
 import { statementTotals, type StatementPeriod } from "./statement";
+import { displayCategory } from "./transaction-category";
 
 const PAGE_WIDTH = 210;
 const PAGE_HEIGHT = 297;
@@ -162,7 +163,7 @@ function drawTransactionRow(doc: jsPDF, item: Transaction, y: number) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(fontSize);
   const description = doc.splitTextToSize(item.description, columns[1].width - 6) as string[];
-  const category = doc.splitTextToSize(item.category || "Outros", columns[2].width - 6) as string[];
+  const category = doc.splitTextToSize(displayCategory(item.category), columns[2].width - 6) as string[];
   const lines = Math.max(description.length, category.length, 1);
   const height = Math.max(9, lines * lineHeight + 4);
 
@@ -214,7 +215,7 @@ export function createStatementPdf(
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8.5);
       const description = doc.splitTextToSize(item.description, columns[1].width - 6) as string[];
-      const category = doc.splitTextToSize(item.category || "Outros", columns[2].width - 6) as string[];
+      const category = doc.splitTextToSize(displayCategory(item.category), columns[2].width - 6) as string[];
       const rowHeight = Math.max(9, Math.max(description.length, category.length) * 4.2 + 4);
 
       if (y + rowHeight > PAGE_HEIGHT - 17) {

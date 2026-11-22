@@ -10,10 +10,7 @@ import {
   type MappedBankTransaction,
 } from "../src/utils/pluggy.js";
 import { selectDefaultAccount } from "../src/utils/bank.js";
-import {
-  canonicalCategory,
-  categorizeTransaction,
-} from "../src/utils/transaction-category.js";
+import { categorizeTransaction } from "../src/utils/transaction-category.js";
 import {
   ApiError,
   bodyRecord,
@@ -61,6 +58,14 @@ async function getPluggyItemId(uid: string) {
   const profile = await userReference(uid).get();
   const publicItemId = profile.data()?.pluggyItemId;
   return typeof publicItemId === "string" ? publicItemId : "";
+}
+
+function assertItemOwnership(item: PluggyItem, uid: string) {
+  const owner =
+    typeof item.clientUserId === "string" ? item.clientUserId.trim() : "";
+  if (owner !== uid) {
+    throw new ApiError("Esta conexão não pertence ao usuário.", 403);
+  }
 }
 
 async function savePluggyConnection(uid: string, item: PluggyItem) {
@@ -176,11 +181,10 @@ async function recategorizeTransactions(uid: string) {
   snapshot.docs.forEach((document) => {
     const data = document.data();
     if (!data.pierreId && !data.externalId) return;
+    if (data.categorySource === "manual") return;
     imported += 1;
 
     const current = typeof data.category === "string" ? data.category : "";
-    if (canonicalCategory(current) === current && current !== "Outros") return;
-
     const type =
       data.type === "income" || data.type === "investment"
         ? data.type
@@ -220,6 +224,7 @@ async function syncPluggy(uid: string, body: Record<string, unknown>) {
   const { from, to } = syncPeriod(body);
   const apiKey = await pluggyAuth();
   const item = await fetchItem(apiKey, itemId);
+  assertItemOwnership(item, uid);
   const rawAccounts = await fetchAccounts(apiKey, itemId);
   const accounts = mapPluggyAccounts(rawAccounts);
   if (!accounts.length) {
@@ -253,6 +258,8 @@ async function updatePluggyItem(uid: string) {
     throw new ApiError("Conecte uma conta do Pluggy primeiro.", 412);
   }
   const apiKey = await pluggyAuth();
+  const current = await fetchItem(apiKey, itemId);
+  assertItemOwnership(current, uid);
   const item = await requestItemUpdate(apiKey, itemId);
   await userReference(uid).set(
     {
@@ -275,6 +282,7 @@ async function pluggyStatus(uid: string) {
   }
   const apiKey = await pluggyAuth();
   const item = await fetchItem(apiKey, itemId);
+  assertItemOwnership(item, uid);
   await userReference(uid).set(
     {
       pluggyItemStatus: item.status || null,
@@ -295,8 +303,11 @@ async function disconnectPluggy(uid: string) {
   if (itemId) {
     try {
       const apiKey = await pluggyAuth();
+      const item = await fetchItem(apiKey, itemId);
+      assertItemOwnership(item, uid);
       await deleteItem(apiKey, itemId);
     } catch (error) {
+      if (error instanceof ApiError && error.status === 403) throw error;
       console.warn("Não foi possível remover o item no Pluggy; limpando apenas o vínculo local.", {
         error: error instanceof Error ? error.message : String(error),
       });
@@ -343,14 +354,16 @@ async function createToken(uid: string, body: Record<string, unknown>) {
     typeof body.itemId === "string" && body.itemId.trim()
       ? body.itemId.trim()
       : null;
+  const apiKey = await pluggyAuth();
   if (itemId) {
     const storedItemId = await getPluggyItemId(uid);
     if (storedItemId !== itemId) {
       throw new ApiError("Esta conexão não pertence ao usuário.", 403);
     }
+    const item = await fetchItem(apiKey, itemId);
+    assertItemOwnership(item, uid);
   }
 
-  const apiKey = await pluggyAuth();
   const connectToken = await createConnectToken(apiKey, {
     clientUserId: uid,
     itemId,
@@ -368,6 +381,7 @@ async function savePluggyItem(uid: string, body: Record<string, unknown>) {
 
   const apiKey = await pluggyAuth();
   const item = await fetchItem(apiKey, itemId);
+  assertItemOwnership(item, uid);
   const rawAccounts = await fetchAccounts(apiKey, itemId);
   const accounts = mapPluggyAccounts(rawAccounts);
   if (!accounts.length) {
@@ -421,7 +435,7 @@ export default async function handler(
   try {
     const uid = await verifyFirebaseToken(token);
     const body = bodyRecord(request.body);
-    const action = typeof body.action === "string" ? body.action : "sync";
+    const action = typeof body.action === "string" ? body.action.trim() : "";
 
     if (action === "connect-token") {
       return response.status(200).json(await createToken(uid, body));
@@ -454,9 +468,11 @@ export default async function handler(
     });
     return response.status(status).json({
       error:
-        error instanceof Error
-          ? error.message
-          : "Não foi possível falar com o Pluggy agora.",
+        status >= 500
+          ? "Não foi possível falar com o Pluggy agora."
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível falar com o Pluggy agora.",
     });
   }
 }

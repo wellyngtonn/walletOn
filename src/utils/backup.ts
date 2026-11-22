@@ -6,6 +6,7 @@ import type {
   TransactionInput,
   TransactionType,
 } from "../types";
+import { displayCategory } from "./transaction-category";
 
 type BackupRecord = Record<string, unknown>;
 
@@ -69,13 +70,30 @@ function amountValue(value: unknown) {
   return Number.isFinite(amount) ? Math.abs(amount) : 0;
 }
 
+function validIsoDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "";
+  const date = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
+    ? value
+    : "";
+}
+
+function localIsoDate(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 function dateValue(value: unknown) {
   const text = stringValue(value);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const leading = text.match(/^\d{4}-\d{2}-\d{2}/);
+  if (leading) return validIsoDate(leading[0]);
   const brazilian = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if (brazilian) return `${brazilian[3]}-${brazilian[2]}-${brazilian[1]}`;
+  if (brazilian) {
+    return validIsoDate(`${brazilian[3]}-${brazilian[2]}-${brazilian[1]}`);
+  }
   const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString().slice(0, 10);
+  return Number.isNaN(parsed.getTime()) ? "" : validIsoDate(localIsoDate(parsed));
 }
 
 function typeValue(
@@ -83,9 +101,15 @@ function typeValue(
   fallback: TransactionType = "expense",
 ): TransactionType {
   const valueText = stringValue(value).toLowerCase();
-  if (["receita", "income", "entrada"].includes(valueText)) return "income";
-  if (["investimento", "investment"].includes(valueText)) return "investment";
-  if (["despesa", "expense", "saída", "saida"].includes(valueText)) {
+  if (["receita", "receitas", "income", "entrada", "entradas"].includes(valueText)) {
+    return "income";
+  }
+  if (["investimento", "investimentos", "investment"].includes(valueText)) {
+    return "investment";
+  }
+  if (
+    ["despesa", "despesas", "expense", "saída", "saidas"].includes(valueText)
+  ) {
     return "expense";
   }
   return fallback;
@@ -108,10 +132,12 @@ export function normalizeBackup(value: unknown): BackupData {
   if (
     !data ||
     (!Array.isArray(data.tx) &&
+      !Array.isArray(data.plan) &&
+      !Array.isArray(data.rec) &&
       !Array.isArray(data.shop) &&
       !Array.isArray(data.history))
   ) {
-    throw new Error("O backup precisa conter uma lista de transações em tx.");
+    throw new Error("O backup não contém dados financeiros reconhecíveis.");
   }
   return {
     tx: Array.isArray(data.tx) ? data.tx : [],
@@ -145,7 +171,11 @@ export function normalizeTransaction(
   const pierreId = stringValue(item.pierreId);
   const externalId = stringValue(item.externalId);
   const provider = stringValue(item.provider);
-  if (category) data.category = category;
+  const categorySource = stringValue(item.categorySource);
+  if (category) data.category = displayCategory(category);
+  if (categorySource === "manual" || categorySource === "auto") {
+    data.categorySource = categorySource;
+  }
   if (accountId) data.accountId = accountId;
   if (pierreId) data.pierreId = pierreId;
   if (externalId) data.externalId = externalId;
@@ -280,12 +310,16 @@ export function normalizeShoppingHistory(
         historyItem !== null,
     );
   if (!items.length) return null;
+  const title = stringValue(item.title).slice(0, 120);
+  const photoUrl = stringValue(item.photoUrl).slice(0, 500);
   return {
     id: importId("history", item.id),
     data: {
       date,
       total: amountValue(item.total),
       items,
+      ...(title ? { title } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
     },
   };
 }

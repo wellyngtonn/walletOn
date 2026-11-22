@@ -16,6 +16,7 @@ import {
   saveAccountSelection,
 } from "@/services/profile";
 import { Toast } from "@/components/toast";
+import { isoDate } from "@/utils/format";
 
 const MONTHS = [
   "Janeiro",
@@ -142,8 +143,8 @@ export function PierreImport() {
         setAccounts(saved.accounts);
       }
       const importedResult = await syncPierreRange(
-        ago.toISOString().slice(0, 10),
-        today.toISOString().slice(0, 10),
+        isoDate(ago),
+        isoDate(today),
         selectedAccountId || savedAccountId,
         true,
       );

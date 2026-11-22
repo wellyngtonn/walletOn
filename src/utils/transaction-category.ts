@@ -1,5 +1,5 @@
-import { CATEGORY_META } from "./categories.js";
-import { normalizeText } from "./text.js";
+import { CATEGORY_META } from "./categories";
+import { normalizeText } from "./text";
 
 export type CategorizableTransactionType =
   | "income"
@@ -15,6 +15,8 @@ export interface CategorizationInput {
   merchantCategory?: string | null;
   operationType?: string | null;
   type?: CategorizableTransactionType;
+  /** Categoria escolhida pelo usuário e que não deve ser recalculada. */
+  categoryIsManual?: boolean;
 }
 
 type CategoryRule = [RegExp, string];
@@ -145,9 +147,9 @@ const PROVIDER_CATEGORY_RULES: CategoryRule[] = [
   [/\b(donations?|gambling|lottery|online bet)\b/, "Outros"],
 ];
 
-// Termos comuns em extratos e estabelecimentos brasileiros. A ordem importa:
-// nomes compostos e casos específicos vêm antes dos genéricos.
-const DESCRIPTION_RULES: CategoryRule[] = [
+// Estabelecimentos e termos específicos. Têm prioridade sobre a categoria do
+// provedor, que costuma ser genérica demais.
+const MERCHANT_RULES: CategoryRule[] = [
   [/\b(mercado livre|mercadolivre)\b/, "Compras"],
   [/\b(amazon prime)\b/, "Assinaturas"],
   [
@@ -155,12 +157,12 @@ const DESCRIPTION_RULES: CategoryRule[] = [
     "Restaurantes",
   ],
   [
-    /\b(supermercado|carrefour|pao de acucar|assai|atacadao|hortifruti|zaffari|walmart|mercado|extra)\b/,
+    /\b(supermercado|hipermercado|atacarejo|carrefour|pao de acucar|assai|atacadao|hortifruti|zaffari|walmart|mercado(?!\s+(?:pago|livre)))\b/,
     "Supermercado",
   ],
   [/\b(posto|gasolina|etanol|combustivel|shell|ipiranga|petrobras)\b/, "Combustível"],
   [
-    /\b(uber|99app|99pop|99|cabify|taxi|onibus|metro|bilhete unico|pedagio|estacionamento|sem parar|veloe|conectcar)\b/,
+    /\b(uber|99app|99pop|99taxi|cabify|taxi|onibus|metro|bilhete unico|pedagio|estacionamento|sem parar|veloe|conectcar)\b/,
     "Transporte",
   ],
   [/\b(farmacia|drogaria|drogasil|droga raia|pacheco|ultrafarma)\b/, "Farmácia"],
@@ -203,8 +205,13 @@ const DESCRIPTION_RULES: CategoryRule[] = [
     /\b(amazon|shopee|aliexpress|magalu|americanas|casas bahia|eletro|celular|informatica)\b/,
     "Compras",
   ],
+];
+
+// Termos genéricos de extrato. Ficam depois da categoria do provedor para não
+// sobrescrever informações mais específicas vindas do Open Finance.
+const GENERIC_RULES: CategoryRule[] = [
   [
-    /\b(compra|compra cartao|compra no debito|compra no credito|compra internacional|compra parcelada)\b/,
+    /\b(compra|compra cartao|compra no debito|compra no credito|compra internacional|compra parcelada|ccd|ccc)\b/,
     "Compras",
   ],
   [/\b(estorno|reembolso)\b/, "Receitas"],
@@ -260,15 +267,42 @@ export function isKnownCategory(value?: string | null) {
 }
 
 /**
+ * Rótulo em português para exibição, incluindo categorias antigas gravadas em
+ * inglês pelo provedor.
+ */
+export function displayCategory(value?: string | null) {
+  const canonical = canonicalCategory(value);
+  if (canonical) return canonical;
+
+  const providerCategory = matchRule(value || "", PROVIDER_CATEGORY_RULES);
+  if (providerCategory) return providerCategory;
+
+  const trimmed = (value || "").trim();
+  return trimmed || "Outros";
+}
+
+/**
  * Resolve a categoria final de um lançamento:
- * 1. categoria do provedor quando já é uma categoria do app;
- * 2. árvore de categorias do Pluggy;
- * 3. palavras-chave da descrição/estabelecimento;
- * 4. tipo de operação bancária;
- * 5. fallback pelo tipo do lançamento.
+ * 1. categoria manual escolhida pelo usuário;
+ * 2. palavras-chave específicas da descrição/estabelecimento;
+ * 3. categoria do provedor quando já é uma categoria do app;
+ * 4. árvore de categorias do Pluggy;
+ * 5. palavras-chave genéricas de extrato;
+ * 6. tipo de operação bancária;
+ * 7. fallback pelo tipo do lançamento.
  */
 export function categorizeTransaction(input: CategorizationInput): string {
   const existing = canonicalCategory(input.category);
+  if (input.categoryIsManual) {
+    return existing || input.category?.trim() || "Outros";
+  }
+
+  const descriptionText = [input.description, input.merchantName]
+    .filter(Boolean)
+    .join(" ");
+  const merchantCategory = matchRule(descriptionText, MERCHANT_RULES);
+  if (merchantCategory) return merchantCategory;
+
   if (existing && existing !== "Outros") return existing;
 
   const providerText = [input.category, input.merchantCategory]
@@ -277,11 +311,8 @@ export function categorizeTransaction(input: CategorizationInput): string {
   const providerCategory = matchRule(providerText, PROVIDER_CATEGORY_RULES);
   if (providerCategory) return providerCategory;
 
-  const descriptionText = [input.description, input.merchantName]
-    .filter(Boolean)
-    .join(" ");
-  const descriptionCategory = matchRule(descriptionText, DESCRIPTION_RULES);
-  if (descriptionCategory) return descriptionCategory;
+  const genericCategory = matchRule(descriptionText, GENERIC_RULES);
+  if (genericCategory) return genericCategory;
 
   const operationType = (input.operationType || "")
     .trim()

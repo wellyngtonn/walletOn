@@ -11,11 +11,14 @@ export function useTransactions(
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   useEffect(() => {
+    setError("");
     if (!uid) {
+      setTransactions([]);
       setLoading(false);
       return;
     }
     setLoading(true);
+    setTransactions([]);
     return subscribeTransactions(
       uid,
       month,

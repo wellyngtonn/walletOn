@@ -255,7 +255,7 @@ export function ShoppingPage() {
         setBarcodeStatus("warn");
         return;
       }
-      setName(productName);
+      setName((current) => (current.trim() ? current : productName));
       setBarcodeStatus("ok");
       nameRef.current?.focus();
     } catch {

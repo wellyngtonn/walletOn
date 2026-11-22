@@ -30,29 +30,34 @@ export function useShoppingList() {
     setHistory(cachedHistory || []);
     setLoading(!cached || !cachedHistory);
     setError("");
+    let itemsLoaded = Boolean(cached);
+    let historyLoaded = Boolean(cachedHistory);
+    const finishLoading = () => {
+      if (itemsLoaded && historyLoaded) setLoading(false);
+    };
+    const onError = (exception: Error) => {
+      setError(exception.message);
+      setLoading(false);
+    };
     const unsubscribeItems = subscribeShoppingItems(
       uid,
       (nextItems) => {
         shoppingCache.set(uid, nextItems);
         setItems(nextItems);
-        setLoading(false);
+        itemsLoaded = true;
+        finishLoading();
       },
-      (exception) => {
-        setError(exception.message);
-        setLoading(false);
-      },
+      onError,
     );
     const unsubscribeHistory = subscribeShoppingHistory(
       uid,
       (nextHistory) => {
         shoppingHistoryCache.set(uid, nextHistory);
         setHistory(nextHistory);
-        setLoading(false);
+        historyLoaded = true;
+        finishLoading();
       },
-      (exception) => {
-        setError(exception.message);
-        setLoading(false);
-      },
+      onError,
     );
     return () => {
       unsubscribeItems();

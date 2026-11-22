@@ -3,9 +3,17 @@ import { withTrailingSlash } from "@/utils/api-url";
 import { shoppingProductName } from "@/utils/shopping-product";
 import { catalogProduct, saveCatalogProduct } from "@/services/product-catalog";
 
-const barcodeApiUrl = withTrailingSlash(
-  process.env.NEXT_PUBLIC_BARCODE_API_URL || "/api/barcode",
-);
+function barcodeApiUrl() {
+  const configured = process.env.NEXT_PUBLIC_BARCODE_API_URL;
+  if (configured) return withTrailingSlash(configured);
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname.endsWith(".web.app")
+  ) {
+    return "https://wallet-on.vercel.app/api/barcode/";
+  }
+  return "/api/barcode/";
+}
 
 export async function lookupBarcode(code: string, signal: AbortSignal) {
   const user = auth.currentUser;
@@ -25,7 +33,7 @@ export async function lookupBarcode(code: string, signal: AbortSignal) {
   try {
     const token = await auth.currentUser?.getIdToken();
     if (!token) throw new Error("Faça login para consultar produtos.");
-    const response = await fetch(barcodeApiUrl, {
+    const response = await fetch(barcodeApiUrl(), {
       method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ barcode: code }), signal,
     });
@@ -39,6 +47,9 @@ export async function lookupBarcode(code: string, signal: AbortSignal) {
   }
   const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}?fields=product_name,product_name_pt,abbreviated_product_name,brands,quantity,product_quantity,product_quantity_unit`, { signal });
   if (!response.ok) throw new Error("Não foi possível consultar o produto. Tente novamente ou digite o nome.");
-  const data = await response.json();
-  return remember(shoppingProductName(data.product, code), notice ? `${notice} Usando a base alternativa.` : "");
+  const data = await response.json().catch(() => null);
+  return remember(
+    shoppingProductName(data?.product, code),
+    notice ? `${notice} Usando a base alternativa.` : "",
+  );
 }

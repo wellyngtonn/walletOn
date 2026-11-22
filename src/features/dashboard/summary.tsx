@@ -7,6 +7,7 @@ import { currency, dateBR, typeLabels } from "@/utils/format";
 import { isImportedTransaction } from "@/utils/bank";
 import { categoryIcon } from "@/utils/pierre-category";
 import { cleanTransactionName } from "@/utils/transaction-name";
+import { displayCategory } from "@/utils/transaction-category";
 import { ExpenseHeatmap } from "@/components/expense-heatmap";
 import { useBankSyncStatus } from "@/hooks/useBankAutoSync";
 
@@ -140,15 +141,17 @@ export function Summary({
             </p>
           ) : (
             <div className="tx-list flex-1">
-              {recent.map((transaction) => (
+              {recent.map((transaction) => {
+                const category = displayCategory(transaction.category);
+                return (
                 <div key={transaction.id} className="tx-item">
                   <div
                     className={`tx-icon ${transaction.type === "income" ? "in" : "out"}`}
-                    title={transaction.category || "Outros"}
-                    aria-label={`Categoria: ${transaction.category || "Outros"}`}
+                    title={category}
+                    aria-label={`Categoria: ${category}`}
                   >
                     {categoryIcon(
-                      transaction.category,
+                      category,
                       transaction.description,
                       transaction.type,
                     )}
@@ -169,7 +172,8 @@ export function Summary({
                       : `${transaction.type === "income" ? "+" : "−"} ${currency(transaction.amount)}`}
                   </p>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

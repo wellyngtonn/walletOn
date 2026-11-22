@@ -57,6 +57,7 @@ export default function ConfiguracoesPage() {
     const saved = (localStorage.getItem("wallet-accent") ||
       "green") as AccentColor;
     setAccent(saved);
+    document.documentElement.dataset.accent = saved;
   }, []);
 
   function chooseAccent(c: AccentColor) {
@@ -235,7 +236,7 @@ export default function ConfiguracoesPage() {
     if (!user) return;
     if (
       !confirm(
-        "Tem certeza? Esta ação apagará todas as suas transações e não pode ser desfeita.",
+        "Tem certeza? Esta ação apagará transações, planos e recorrências. A lista e o histórico de compras serão mantidos. Não pode ser desfeita.",
       )
     )
       return;
@@ -347,7 +348,7 @@ export default function ConfiguracoesPage() {
               {recategorizing ? "Recategorizando..." : "Recategorizar Lançamentos"}
             </button>
             <button onClick={clearAll} className="btn-danger">
-              Apagar Todos os Dados
+              Apagar Lançamentos e Planejamento
             </button>
           </div>
           <StatementExport onStatus={setToast} embedded />

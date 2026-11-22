@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/config";
+import { todayISO } from "@/utils/format";
 import type {
   ShoppingHistory,
   ShoppingHistoryInput,
@@ -38,6 +39,7 @@ function storedHistory(snapshotId: string, value: unknown): ShoppingHistory | nu
     typeof record.userId !== "string" ||
     typeof record.date !== "string" ||
     typeof record.total !== "number" ||
+    !Number.isFinite(record.total) ||
     !Array.isArray(record.items)
   ) {
     return null;
@@ -70,6 +72,14 @@ function storedHistory(snapshotId: string, value: unknown): ShoppingHistory | nu
 
 function createId() {
   return `shop-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function safeQty(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : 1;
+}
+
+function safePrice(value: number) {
+  return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
 export function subscribeShoppingItems(
@@ -166,6 +176,7 @@ export async function deleteShoppingItemsBatch(uid: string, ids: string[]) {
 
 export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
   if (!items.length) return 0;
+  let archived = 0;
 
   await runTransaction(db, async (transaction) => {
     const userReference = userPath(uid);
@@ -175,11 +186,13 @@ export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
     const itemsToArchive = currentItems.filter(
       (item) => itemIds.has(item.id) && item.done,
     );
+    archived = itemsToArchive.length;
     if (!itemsToArchive.length) return;
+    const archiveIds = new Set(itemsToArchive.map((item) => item.id));
 
     const groups = new Map<string, ShoppingItem[]>();
     itemsToArchive.forEach((item) => {
-      const date = item.completedDate || new Date().toISOString().slice(0, 10);
+      const date = item.completedDate || todayISO();
       groups.set(date, [...(groups.get(date) || []), item]);
     });
 
@@ -200,14 +213,17 @@ export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
         ...(existing?.items || []),
         ...groupedItems.map((item) => ({
           name: item.name,
-          qty: item.qty,
-          price: item.price,
+          qty: safeQty(item.qty),
+          price: safePrice(item.price),
           ...(item.barcode ? { barcode: item.barcode } : {}),
         })),
       ];
       const total =
         (existing?.total || 0) +
-        groupedItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+        groupedItems.reduce(
+          (sum, item) => sum + safeQty(item.qty) * safePrice(item.price),
+          0,
+        );
       const historyData = {
         id: reference.id,
         userId: uid,
@@ -227,14 +243,14 @@ export async function archiveShoppingItems(uid: string, items: ShoppingItem[]) {
     transaction.set(
       userReference,
       {
-        shopping: currentItems.filter((item) => !itemIds.has(item.id)),
+        shopping: currentItems.filter((item) => !archiveIds.has(item.id)),
         updatedAt: serverTimestamp(),
       },
       { merge: true },
     );
   });
 
-  return items.length;
+  return archived;
 }
 
 export async function finalizeShoppingItems(uid: string) {
@@ -244,7 +260,7 @@ export async function finalizeShoppingItems(uid: string) {
     const currentItems = storedItems(userSnapshot.data()?.shopping);
     if (!currentItems.length) return;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayISO();
     const groups = new Map<string, ShoppingItem[]>();
     currentItems.forEach((item) => {
       const date = item.done ? item.completedDate || today : today;
@@ -268,14 +284,17 @@ export async function finalizeShoppingItems(uid: string) {
         ...(existing?.items || []),
         ...groupedItems.map((item) => ({
           name: item.name,
-          qty: item.qty,
-          price: item.price,
+          qty: safeQty(item.qty),
+          price: safePrice(item.price),
           ...(item.barcode ? { barcode: item.barcode } : {}),
         })),
       ];
       const total =
         (existing?.total || 0) +
-        groupedItems.reduce((sum, item) => sum + item.qty * item.price, 0);
+        groupedItems.reduce(
+          (sum, item) => sum + safeQty(item.qty) * safePrice(item.price),
+          0,
+        );
       const historyData = {
         id: reference.id,
         userId: uid,

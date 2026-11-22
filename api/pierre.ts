@@ -328,7 +328,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   try {
     const uid = await verifyFirebaseToken(token);
     const body = bodyRecord(request.body);
-    const action = typeof body.action === "string" ? body.action : "sync";
+    const action = typeof body.action === "string" ? body.action.trim() : "";
 
     if (action === "validate") {
       const key = typeof body.key === "string" ? body.key.trim() : "";
@@ -369,7 +369,12 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       stack: error instanceof Error ? error.stack : undefined,
     });
     return response.status(status).json({
-      error: error instanceof Error ? error.message : "Não foi possível sincronizar o Pierre agora.",
+      error:
+        status >= 500
+          ? "Não foi possível sincronizar o Pierre agora."
+          : error instanceof Error
+            ? error.message
+            : "Não foi possível sincronizar o Pierre agora.",
     });
   }
 }

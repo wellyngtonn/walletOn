@@ -1,34 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { auth } from "@/lib/firebase/config";
+import { useAuth } from "@/hooks/useAuth";
 import { syncBankData } from "@/services/bank";
 import type { BankProvider } from "@/utils/bank";
 
 const BANK_SYNC_EVENT = "wallet-bank-sync-complete";
 const BANK_SYNC_STORAGE = "wallet-bank-sync-complete";
-const LEGACY_SYNC_STORAGE = "wallet-pierre-sync-complete";
 const MIN_RESUME_SYNC_INTERVAL_MS = 60_000;
 
-export function markBankSyncComplete() {
+function syncStorageKey(uid?: string | null) {
+  return uid ? `${BANK_SYNC_STORAGE}:${uid}` : "";
+}
+
+export function markBankSyncComplete(uid?: string) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(BANK_SYNC_STORAGE, "1");
+  const key = syncStorageKey(uid || auth.currentUser?.uid);
+  if (!key) return;
+  window.sessionStorage.setItem(key, "1");
   window.dispatchEvent(new Event(BANK_SYNC_EVENT));
 }
 
-export function useBankSyncStatus() {
+export function useBankSyncStatus(uid?: string) {
+  const { user } = useAuth();
+  const activeUid = uid || user?.uid;
   const [synced, setSynced] = useState(false);
 
   useEffect(() => {
+    const key = syncStorageKey(activeUid);
     const update = () => {
-      setSynced(
-        window.sessionStorage.getItem(BANK_SYNC_STORAGE) === "1" ||
-          window.sessionStorage.getItem(LEGACY_SYNC_STORAGE) === "1",
-      );
+      setSynced(Boolean(key && window.sessionStorage.getItem(key) === "1"));
     };
     update();
     window.addEventListener(BANK_SYNC_EVENT, update);
     return () => window.removeEventListener(BANK_SYNC_EVENT, update);
-  }, []);
+  }, [activeUid]);
 
   return synced;
 }
@@ -46,12 +53,16 @@ export function useBankAutoSync({
   preferredAccountId?: string | null;
   profileLoading: boolean;
 }) {
-  const startedForUid = useRef<string | null>(null);
+  const startedFor = useRef<string | null>(null);
   const syncing = useRef(false);
   const lastSyncAt = useRef(0);
 
   useEffect(() => {
+    if (!connected || !provider) {
+      startedFor.current = null;
+    }
     if (!uid || !connected || !provider || profileLoading) return;
+    const syncKey = `${uid}:${provider}`;
 
     const runSync = () => {
       if (syncing.current) return;
@@ -67,8 +78,8 @@ export function useBankAutoSync({
         });
     };
 
-    if (startedForUid.current !== uid) {
-      startedForUid.current = uid;
+    if (startedFor.current !== syncKey) {
+      startedFor.current = syncKey;
       runSync();
     }
 

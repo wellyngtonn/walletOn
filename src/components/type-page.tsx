@@ -26,7 +26,7 @@ export function TypePage({ type }: { type: TransactionType }) {
         <h2 className="sec-title">{title}</h2>
         <button
           type="button"
-          onClick={openCreate}
+          onClick={() => openCreate(type)}
           className="btn-primary rounded-full px-5 py-3 text-lg font-bold md:rounded-[10px] md:px-4 md:py-[9px] md:text-sm"
         >
           <span className="md:hidden">+</span>

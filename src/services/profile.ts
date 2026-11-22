@@ -116,16 +116,15 @@ export function subscribeBankProfile(
           ? stringValue(data.pluggyAccountId)
           : stringValue(data.pierreAccountId) ||
             stringValue(legacyConfig.pierreAccountId);
-      const configuredBalance =
+      const balanceCandidates =
         provider === "pluggy"
-          ? typeof data.pluggyBalance === "number"
-            ? data.pluggyBalance
-            : null
-          : typeof data.pierreBalance === "number"
-            ? data.pierreBalance
-            : typeof legacyConfig.pierreTotalBalance === "number"
-              ? legacyConfig.pierreTotalBalance
-              : null;
+          ? [data.pluggyBalance]
+          : [data.pierreBalance, legacyConfig.pierreTotalBalance];
+      const configuredBalance =
+        balanceCandidates.find(
+          (value): value is number =>
+            typeof value === "number" && Number.isFinite(value),
+        ) ?? null;
       const selectedAccount =
         accounts.find((account) => account.id === configuredAccountId) ||
         selectDefaultAccount(accounts);

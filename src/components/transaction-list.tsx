@@ -7,6 +7,7 @@ import { currency, dateBR, typeLabels } from "@/utils/format";
 import { friendlyError } from "@/utils/errors";
 import { categoryIcon } from "@/utils/pierre-category";
 import { cleanTransactionName } from "@/utils/transaction-name";
+import { displayCategory } from "@/utils/transaction-category";
 
 export function TransactionList({
   items,
@@ -40,14 +41,16 @@ export function TransactionList({
     <>
       {error && <div className="msg-error mb-2">{error}</div>}
       <div className="tx-list">
-      {items.map((t) => (
+      {items.map((t) => {
+        const category = displayCategory(t.category);
+        return (
         <div key={t.id} className="tx-item">
           <div
             className={`tx-icon ${t.type === "income" ? "in" : "out"}`}
-            title={t.category || "Outros"}
-            aria-label={`Categoria: ${t.category || "Outros"}`}
+            title={category}
+            aria-label={`Categoria: ${category}`}
           >
-            {categoryIcon(t.category, t.description, t.type)}
+            {categoryIcon(category, t.description, t.type)}
           </div>
           <div className="tx-info">
             <p className="tx-desc">{cleanTransactionName(t.description)}</p>
@@ -72,7 +75,8 @@ export function TransactionList({
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
       </div>
     </>
   );

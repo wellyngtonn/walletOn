@@ -5,16 +5,20 @@ import { createTransaction, updateTransaction } from "@/services/transactions";
 import type { Transaction, TransactionInput, TransactionType } from "@/types";
 import { CATEGORY_LABELS } from "@/utils/categories";
 import { cleanTransactionName } from "@/utils/transaction-name";
+import { displayCategory } from "@/utils/transaction-category";
+import { todayISO } from "@/utils/format";
 
 export function TransactionModal({
   open,
   transaction,
+  initialType = "expense",
   month,
   year,
   onClose,
 }: {
   open: boolean;
   transaction: Transaction | null;
+  initialType?: TransactionType;
   month: number;
   year: number;
   onClose: () => void;
@@ -23,10 +27,10 @@ export function TransactionModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState<TransactionInput>({
-    type: "expense",
+    type: initialType,
     description: "",
     amount: 0,
-    date: new Date().toISOString().slice(0, 10),
+    date: todayISO(),
     referenceMonth: month,
     referenceYear: year,
     category: "Outros",
@@ -43,19 +47,19 @@ export function TransactionModal({
               date: transaction.date,
               referenceMonth: transaction.referenceMonth,
               referenceYear: transaction.referenceYear,
-              category: transaction.category || "Outros",
+              category: displayCategory(transaction.category),
             }
           : {
-              type: "expense",
+              type: initialType,
               description: "",
               amount: 0,
-              date: new Date().toISOString().slice(0, 10),
+              date: todayISO(),
               referenceMonth: month,
               referenceYear: year,
               category: "Outros",
             },
       );
-  }, [open, transaction, month, year]);
+  }, [open, transaction, initialType, month, year]);
 
   if (!open) return null;
 
@@ -65,8 +69,14 @@ export function TransactionModal({
     setSaving(true);
     setError("");
     try {
-      if (transaction) await updateTransaction(user.uid, transaction.id, form);
-      else await createTransaction(user.uid, form);
+      const categoryChanged =
+        transaction &&
+        form.category !== displayCategory(transaction.category);
+      const payload: TransactionInput = categoryChanged
+        ? { ...form, categorySource: "manual" }
+        : form;
+      if (transaction) await updateTransaction(user.uid, transaction.id, payload);
+      else await createTransaction(user.uid, payload);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Não foi possível salvar.");

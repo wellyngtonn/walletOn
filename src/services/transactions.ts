@@ -2,6 +2,7 @@ import {
   addDoc,
   collection,
   deleteDoc,
+  deleteField,
   doc,
   type DocumentReference,
   getDocs,
@@ -9,6 +10,7 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  setDoc,
   updateDoc,
   where,
   writeBatch,
@@ -68,6 +70,22 @@ export const createTransaction = (uid: string, data: TransactionInput) =>
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+
+export const createTransactionWithId = (
+  uid: string,
+  id: string,
+  data: TransactionInput,
+) =>
+  setDoc(
+    doc(path(uid), id),
+    {
+      ...data,
+      userId: uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 
 export async function listTransactions(uid: string): Promise<Transaction[]> {
   const snapshot = await getDocs(path(uid));
@@ -148,6 +166,17 @@ export const deleteTransaction = (uid: string, id: string) =>
 
 export const deleteTransactionsBatch = (uid: string, ids: string[]) =>
   deleteDocumentsInBatches(ids.map((id) => doc(path(uid), id)));
+
+export async function deleteTransactionsByRecurrence(
+  uid: string,
+  recurrenceId: string,
+) {
+  const snapshot = await getDocs(
+    query(path(uid), where("recurrenceId", "==", recurrenceId)),
+  );
+  await deleteDocumentsInBatches(snapshot.docs.map((item) => item.ref));
+  return snapshot.size;
+}
 
 function subscribeCollection<T>(
   source: ReturnType<typeof collection>,
@@ -260,6 +289,7 @@ export const updateRecurrence = (
     ...data,
     userId: uid,
     updatedAt: serverTimestamp(),
+    ...(data.limit == null ? { limit: deleteField() } : {}),
   });
 
 export const deleteRecurrence = (uid: string, id: string) =>

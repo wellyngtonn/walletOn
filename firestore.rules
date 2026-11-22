@@ -4,7 +4,7 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
     function validTransaction(uid) {
-      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','referenceMonth','referenceYear','pierreId','externalId','provider','category','accountId','recurrenceId','createdAt','updatedAt'])
+      return request.resource.data.keys().hasOnly(['userId','type','description','amount','date','referenceMonth','referenceYear','pierreId','externalId','provider','category','categorySource','accountId','recurrenceId','createdAt','updatedAt'])
         && request.resource.data.keys().hasAll(['userId','type','description','amount','date','referenceMonth','referenceYear','updatedAt'])
         && request.resource.data.userId == uid
         && request.resource.data.type in ['income','expense','investment']
@@ -22,6 +22,7 @@ service cloud.firestore {
         && (!request.resource.data.keys().hasAny(['externalId']) || request.resource.data.externalId is string)
         && (!request.resource.data.keys().hasAny(['provider']) || request.resource.data.provider in ['pluggy','pierre'])
         && (!request.resource.data.keys().hasAny(['category']) || request.resource.data.category is string)
+        && (!request.resource.data.keys().hasAny(['categorySource']) || request.resource.data.categorySource in ['manual','auto'])
         && (!request.resource.data.keys().hasAny(['accountId']) || request.resource.data.accountId is string)
         && (!request.resource.data.keys().hasAny(['recurrenceId']) || request.resource.data.recurrenceId is string);
     }

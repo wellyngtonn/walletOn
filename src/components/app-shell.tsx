@@ -9,7 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBankProfile } from "@/hooks/useBankProfile";
 import { useBankAutoSync } from "@/hooks/useBankAutoSync";
 import { useTransactions } from "@/hooks/useTransactions";
-import type { Transaction } from "@/types";
+import type { Transaction, TransactionType } from "@/types";
 import type { BankProvider } from "@/utils/bank";
 
 type Ctx = {
@@ -24,7 +24,7 @@ type Ctx = {
   accountName: string | null;
   bankProvider: BankProvider | null;
   openEdit: (t: Transaction) => void;
-  openCreate: () => void;
+  openCreate: (type?: TransactionType) => void;
 };
 
 const DashboardContext = createContext<Ctx | null>(null);
@@ -41,6 +41,7 @@ function Inner({ children }: { children: React.ReactNode }) {
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Transaction | null>(null);
+  const [createType, setCreateType] = useState<TransactionType>("expense");
   const data = useTransactions(user?.uid, month, year);
   const {
     balance: accountBalance,
@@ -64,8 +65,9 @@ function Inner({ children }: { children: React.ReactNode }) {
     setEditing(t);
     setModal(true);
   }
-  function openCreate() {
+  function openCreate(type: TransactionType = "expense") {
     setEditing(null);
+    setCreateType(type);
     setModal(true);
   }
 
@@ -114,6 +116,7 @@ function Inner({ children }: { children: React.ReactNode }) {
         <TransactionModal
           open={modal}
           transaction={editing}
+          initialType={createType}
           month={month}
           year={year}
           onClose={() => setModal(false)}

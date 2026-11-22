@@ -13,6 +13,7 @@ import {
   type PluggyAccount,
 } from "@/services/pluggy";
 import { saveAccountSelection } from "@/services/profile";
+import { isoDate } from "@/utils/format";
 import { Toast } from "@/components/toast";
 
 const MONTHS = [
@@ -173,8 +174,8 @@ export function PluggyImport() {
                 const ago = new Date();
                 ago.setFullYear(today.getFullYear() - 1);
                 const result = await syncPluggyRange(
-                  ago.toISOString().slice(0, 10),
-                  today.toISOString().slice(0, 10),
+                  isoDate(ago),
+                  isoDate(today),
                   saved.accounts.find(
                     (account) => account.id === selectedAccountId,
                   )?.id || saved.accounts[0]?.id,
@@ -242,8 +243,8 @@ export function PluggyImport() {
       const ago = new Date();
       ago.setFullYear(today.getFullYear() - 1);
       const result = await syncPluggyRange(
-        ago.toISOString().slice(0, 10),
-        today.toISOString().slice(0, 10),
+        isoDate(ago),
+        isoDate(today),
         selectedAccountId || savedAccountId,
       );
       markBankSyncComplete();

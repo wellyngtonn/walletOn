@@ -63,7 +63,27 @@ test("descarta dados financeiros inválidos", () => {
   assert.equal(normalizeTransaction({ amount: 0, date: "2026-01-01" }), null);
   assert.equal(normalizePlan({ amount: 10, date: "invalida" }), null);
   assert.equal(normalizeRecurrence({ amount: 10, startDate: "2026-01-01" }), null);
-  assert.throws(() => normalizeBackup({ plan: [] }), /tx/);
+  assert.deepEqual(normalizeBackup({ plan: [] }).plan, []);
+  assert.throws(() => normalizeBackup({ foo: [] }), /reconhecíveis/);
+});
+
+test("valida datas e aceita plurais nos tipos", () => {
+  assert.equal(
+    normalizeTransaction({ amount: 10, date: "31/02/2024" }),
+    null,
+  );
+  assert.equal(
+    normalizeTransaction({ amount: 10, date: "2024-03-15T23:00:00-03:00" })?.data.date,
+    "2024-03-15",
+  );
+  assert.equal(
+    normalizeTransaction({ amount: 10, date: "2026-01-01", tipo: "receitas" })?.data.type,
+    "income",
+  );
+  assert.equal(
+    normalizeTransaction({ amount: 10, date: "2026-01-01", tipo: "investimentos" })?.data.type,
+    "investment",
+  );
 });
 
 test("normaliza historico de compras", () => {
@@ -71,10 +91,14 @@ test("normaliza historico de compras", () => {
     id: "h1",
     date: "08/08/2026",
     total: "R$ 25,50",
+    title: "Mercado do bairro",
+    photoUrl: "https://example.com/cupom.jpg",
     items: [{ name: "Arroz", qty: 2, price: "R$ 12,75" }],
   });
   assert.equal(history?.id, "carteira-history-h1");
   assert.equal(history?.data.date, "2026-08-08");
   assert.equal(history?.data.total, 25.5);
+  assert.equal(history?.data.title, "Mercado do bairro");
+  assert.equal(history?.data.photoUrl, "https://example.com/cupom.jpg");
   assert.deepEqual(history?.data.items[0], { name: "Arroz", qty: 2, price: 12.75 });
 });

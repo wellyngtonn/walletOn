@@ -8,9 +8,10 @@ import { usePlanning } from "@/hooks/usePlanning";
 import {
   createPlan,
   createRecurrence,
-  createTransaction,
+  createTransactionWithId,
   deletePlan,
   deleteRecurrence,
+  deleteTransactionsByRecurrence,
   updatePlan,
   updateRecurrence,
 } from "@/services/transactions";
@@ -86,6 +87,12 @@ function SwipeToEditRow({
       style={{ touchAction: "pan-y", userSelect: "none" }}
       onPointerDown={(event) => {
         if (event.pointerType === "mouse" && event.button !== 0) return;
+        if (
+          event.target instanceof Element &&
+          event.target.closest("button, a, input, select, textarea, [role='button']")
+        ) {
+          return;
+        }
         dragStart.current = { x: event.clientX, y: event.clientY };
         suppressClick.current = false;
         setDragging(true);
@@ -191,6 +198,8 @@ export function PlanningPage() {
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState("");
   const [descriptionFocused, setDescriptionFocused] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Recurrence | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const processing = useRef(false);
 
   const description = modal === "plan" ? planForm.description : recurrenceForm.description;
@@ -278,7 +287,8 @@ export function PlanningPage() {
     Promise.all(
       missing.map((recurrence) => {
         const date = recurrenceDate(recurrence, year, month);
-        return createTransaction(user.uid, {
+        const id = `rec-${recurrence.id}-${year}-${String(month).padStart(2, "0")}`;
+        return createTransactionWithId(user.uid, id, {
           type: recurrence.type,
           description: recurrence.description,
           amount: recurrence.amount,
@@ -289,9 +299,15 @@ export function PlanningPage() {
           recurrenceId: recurrence.id,
         });
       }),
-    ).finally(() => {
-      processing.current = false;
-    });
+    )
+      .catch((exception) => {
+        setActionError(
+          friendlyError(exception, "Não foi possível lançar a recorrência."),
+        );
+      })
+      .finally(() => {
+        processing.current = false;
+      });
   }, [loading, month, recurrences, scheduledRecurrences, transactions, transactionsError, transactionsLoading, user, year]);
 
   function openPlan(plan?: PlannedTransaction) {
@@ -435,12 +451,25 @@ export function PlanningPage() {
     }
   }
 
-  async function removeRecurrence(recurrence: Recurrence) {
-    if (!user || !confirm("Excluir esta recorrência?")) return;
+  function requestRemoveRecurrence(recurrence: Recurrence) {
+    setActionError("");
+    setDeleteTarget(recurrence);
+  }
+
+  async function confirmRemoveRecurrence(alsoDeleteTransactions: boolean) {
+    if (!user || !deleteTarget || deleting) return;
+    setDeleting(true);
+    setActionError("");
     try {
-      await deleteRecurrence(user.uid, recurrence.id);
+      await deleteRecurrence(user.uid, deleteTarget.id);
+      if (alsoDeleteTransactions) {
+        await deleteTransactionsByRecurrence(user.uid, deleteTarget.id);
+      }
+      setDeleteTarget(null);
     } catch (exception) {
       setActionError(friendlyError(exception, "Não foi possível excluir a recorrência."));
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -546,7 +575,7 @@ export function PlanningPage() {
                   </div>
                   <span className={`tx-val ${recurrence.type === "income" ? "in" : "out"}`}>{recurrence.type === "income" ? "+" : "−"} {currency(recurrence.amount)}</span>
                   <div className="planning-actions">
-                    <button type="button" onClick={() => void removeRecurrence(recurrence)} title="Excluir" aria-label={`Excluir ${recurrence.description}`}>×</button>
+                    <button type="button" onClick={() => requestRemoveRecurrence(recurrence)} title="Excluir" aria-label={`Excluir ${recurrence.description}`}>×</button>
                   </div>
                 </SwipeToEditRow>
               );
@@ -609,6 +638,35 @@ export function PlanningPage() {
               {actionError && <div className="msg-error">{actionError}</div>}
             </div>
             <div className="modal-footer"><button className="btn-outline" onClick={() => setModal(null)}>Cancelar</button><button className="btn-primary" onClick={() => void (modal === "plan" ? savePlan() : saveRecurrence())} disabled={saving}>{saving ? "Salvando..." : "Salvar"}</button></div>
+          </div>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="overlay" onClick={() => !deleting && setDeleteTarget(null)}>
+          <div className="pierre-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Excluir recorrência</h3>
+              <button className="modal-close" onClick={() => setDeleteTarget(null)} disabled={deleting}>×</button>
+            </div>
+            <div className="modal-body">
+              <p className="text-[var(--text2)]">
+                Deseja excluir também todas as transações já lançadas da movimentação
+                <strong> {deleteTarget.description}</strong>?
+              </p>
+              {actionError && <div className="msg-error">{actionError}</div>}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Cancelar
+              </button>
+              <button className="btn-outline" onClick={() => void confirmRemoveRecurrence(false)} disabled={deleting}>
+                Só a recorrência
+              </button>
+              <button className="btn-danger" onClick={() => void confirmRemoveRecurrence(true)} disabled={deleting}>
+                {deleting ? "Excluindo..." : "Recorrência + transações"}
+              </button>
+            </div>
           </div>
         </div>
       )}

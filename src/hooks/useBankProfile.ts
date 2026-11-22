@@ -23,8 +23,8 @@ export function useBankProfile(uid: string | undefined) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    setProfile(emptyProfile);
     if (!uid) {
-      setProfile(emptyProfile);
       setLoading(false);
       return;
     }

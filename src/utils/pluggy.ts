@@ -147,12 +147,13 @@ export function mapPluggyTransactions(
           : null,
       };
       const amount = shape.amount ?? 0;
-      const description = cleanTransactionName(
-        shape.description ||
-          shape.descriptionRaw ||
-          textValue(shape.merchant?.name) ||
-          "Pluggy",
-      ).slice(0, 120);
+      const description =
+        cleanTransactionName(
+          shape.description ||
+            shape.descriptionRaw ||
+            textValue(shape.merchant?.name) ||
+            "Pluggy",
+        ).slice(0, 120) || "Pluggy";
       const mappedType = directionValue(shape.type ?? "", amount);
 
       return {

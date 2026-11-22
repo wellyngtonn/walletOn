@@ -7,10 +7,17 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   useEffect(
     () =>
-      onAuthStateChanged(auth, (u) => {
-        setUser(u);
-        setLoading(false);
-      }),
+      onAuthStateChanged(
+        auth,
+        (u) => {
+          setUser(u);
+          setLoading(false);
+        },
+        (error) => {
+          console.error("Falha ao observar a sessão", error);
+          setLoading(false);
+        },
+      ),
     [],
   );
   return { user, loading };

@@ -13,6 +13,8 @@ export interface Transaction {
   externalId?: string;
   provider?: "pluggy" | "pierre";
   category?: string;
+  /** Indica se a categoria foi escolhida manualmente pelo usuário. */
+  categorySource?: "manual" | "auto";
   accountId?: string;
   recurrenceId?: string;
   createdAt?: Timestamp;

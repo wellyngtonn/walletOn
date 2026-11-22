@@ -39,8 +39,8 @@ async function saveGoogleUser(user: { uid: string; displayName: string | null; e
   await setDoc(
     doc(db, "users", user.uid),
     {
-      name: user.displayName,
-      email: user.email,
+      ...(user.displayName ? { name: user.displayName } : {}),
+      ...(user.email ? { email: user.email } : {}),
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -59,12 +59,16 @@ export async function registerEmail(
   password: string,
 ) {
   const result = await createUserWithEmailAndPassword(auth, email, password);
-  await setDoc(doc(db, "users", result.user.uid), {
-    name,
-    email,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  await setDoc(
+    doc(db, "users", result.user.uid),
+    {
+      name,
+      email,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 export const resetPassword = (email: string) =>
   sendPasswordResetEmail(auth, email);

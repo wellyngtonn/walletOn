@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -15,6 +15,7 @@ import type { Transaction } from "@/types";
 import { currency } from "@/utils/format";
 import { CATEGORY_META, DEFAULT_CATEGORY_META } from "@/utils/categories";
 import { filterImportedMovements } from "@/utils/bank";
+import { displayCategory } from "@/utils/transaction-category";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -22,7 +23,7 @@ const MONTHS = [
 ];
 
 function categoryOf(transaction: Transaction) {
-  return transaction.category || "Outros";
+  return displayCategory(transaction.category);
 }
 
 function monthTransactions(items: Transaction[], month: number, year: number) {
@@ -57,6 +58,10 @@ export function MonthlyAnalysis({
   const [typeFilter, setTypeFilter] = useState<"all" | "income" | "expense">("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    setCategoryFilter("all");
+  }, [month, year]);
 
   const pierreItems = useMemo(
     () => filterImportedMovements(items, accountId),
@@ -150,7 +155,7 @@ export function MonthlyAnalysis({
       .reduce((sum, transaction) => sum + transaction.amount, 0);
     const previousChange = previousExpenses
       ? ((currentExpenses - previousExpenses) / previousExpenses) * 100
-      : 0;
+      : null;
 
     const threeMonths: number[] = [];
     for (let offset = 2; offset >= 0; offset--) {
@@ -163,7 +168,7 @@ export function MonthlyAnalysis({
     }
     const growth = threeMonths[0]
       ? ((threeMonths[2] - threeMonths[0]) / threeMonths[0]) * 100
-      : 0;
+      : null;
 
     return { currentExpenses, previousChange, growth };
   }, [month, pierreAllItems, pierreMonth, year]);
@@ -275,10 +280,16 @@ export function MonthlyAnalysis({
           <div className="trend-item">
             <span className="trend-label">Vs Mês Passado</span>
             <strong className="trend-value">
-              {trends.previousChange > 0 ? "↑" : "↓"} {Math.abs(trends.previousChange).toFixed(1)}%
+              {trends.previousChange == null
+                ? "—"
+                : `${trends.previousChange > 0 ? "↑" : "↓"} ${Math.abs(trends.previousChange).toFixed(1)}%`}
             </strong>
             <small className="trend-caption">
-              {trends.previousChange > 0 ? "Gastos aumentaram" : "Gastos diminuíram"}
+              {trends.previousChange == null
+                ? "Sem gastos no mês anterior"
+                : trends.previousChange > 0
+                  ? "Gastos aumentaram"
+                  : "Gastos diminuíram"}
             </small>
           </div>
           <div className="trend-item">
@@ -293,7 +304,9 @@ export function MonthlyAnalysis({
           <div className="trend-item">
             <span className="trend-label">Taxa de Crescimento</span>
             <strong className="trend-value">
-              {trends.growth > 0 ? "+" : ""}{trends.growth.toFixed(1)}%
+              {trends.growth == null
+                ? "—"
+                : `${trends.growth > 0 ? "+" : ""}${trends.growth.toFixed(1)}%`}
             </strong>
             <small className="trend-caption">Últimos 3 meses</small>
           </div>
